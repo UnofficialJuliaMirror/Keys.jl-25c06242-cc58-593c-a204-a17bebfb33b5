@@ -1,10 +1,8 @@
 module Keys
 
-import FastClosures
 import MacroTools
 
 using TypedBools
-export True, False
 using RecurUnroll
 
 import RecurUnroll.T0
@@ -119,9 +117,12 @@ Base.show(io::IO, k::KeyedTuple) =
     end))
 
 which_key(keyed_tuple, key) =
-    @closure1 map(Unroll(keyed_tuple.keys)) do akey
-        typed(akey == key)
-    end
+    map(
+        let key = key
+            akey -> typed(akey == key)
+        end,
+        Unroll(keyed_tuple.keys)
+    )
 
 export match_key
 """
@@ -150,12 +151,8 @@ Base.getindex(k::KeyedTuple, key::Key) =
 
 with(f, k::KeyedTuple) = KeyedTuple(k.keys, roll(f(Unroll(k.values))))
 
-Base.setindex(k::KeyedTuple, value, key) = begin
-    whiches = which_key(k, key)
-    @closure1 with(k) do values
-        Base.setindex(values, value, whiches)
-    end
-end
+Base.setindex(k::KeyedTuple, value, key) =
+    KeyedTuple(k.keys, roll(Base.setindex(Unroll(k.values), value, which_key(k, key))))
 
 Base.merge(k1::KeyedTuple, k2::KeyedTuple) =
     KeyedTuple((k1.keys..., k2.keys...), (k1.values..., k2.values...))
