@@ -116,13 +116,14 @@ Base.show(io::IO, k::KeyedTuple) =
         key => value
     end))
 
-which_key(keyed_tuple, key) =
+function which_key(keyed_tuple, key)
     map(
         let key = key
             akey -> typed(akey == key)
         end,
         Unroll(keyed_tuple.keys)
     )
+end
 
 export match_key
 """
@@ -149,7 +150,9 @@ last_error(x::T0, key) = error("Key $key not found")
 Base.getindex(k::KeyedTuple, key::Key) =
     last_error((match_key(k, key)), key)
 
-with(f, k::KeyedTuple) = KeyedTuple(k.keys, roll(f(Unroll(k.values))))
+function with(f, k::KeyedTuple)
+    KeyedTuple(k.keys, roll(f(Unroll(k.values))))
+end
 
 Base.setindex(k::KeyedTuple, value, key) =
     KeyedTuple(k.keys, roll(Base.setindex(Unroll(k.values), value, which_key(k, key))))
@@ -241,6 +244,10 @@ julia> b
 
 julia> a + b + d
 11//2
+
+julia> @unlock k a*2
+ERROR: Cannot parse unlock argument a * 2
+[...]
 ```
 """
 macro unlock(collection, keys...)
@@ -319,7 +326,9 @@ export get_field
 
 Overload to implement dot overloading [`@overload_dots`](@ref).
 """
-get_field(any, key) = getfield(any, Symbol(key))
+function get_field(any, key)
+    getfield(any, Symbol(key))
+end
 
 get_field(k::KeyedTuple, key) = getindex(k, key)
 
@@ -361,6 +370,13 @@ julia> test(k) = @overload_dots k.a + k.b;
 
 julia> @inferred test(k)
 3.5
+
+julia> x = [k, k];
+
+julia> @overload_dots x..a
+2-element Array{Int64,1}:
+ 1
+ 1
 ```
 """
 macro overload_dots(e)
