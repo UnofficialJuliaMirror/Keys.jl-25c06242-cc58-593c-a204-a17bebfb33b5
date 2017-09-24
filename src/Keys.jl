@@ -75,7 +75,7 @@ instead. A vector of tuples with consistent keys will conveniently print
 as a markdown table.
 
 ```jldoctest
-julia> using Keys, Base.Test
+julia> using Keys, TypedTuples, Base.Test
 
 julia> k = KeyedTuple((@keys a b a), (1, 2.0, "a"))
 (a = 1, b = 2.0, a = "a")
