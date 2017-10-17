@@ -67,7 +67,8 @@ in a type-stable way because the keys are directly encoded into the type.
 You can use repeated keys. `getindex` will take the last match when trying
 to index at a repeated key; for all matches, use [`match_key`](@ref)
 instead. A vector of tuples with consistent keys will conveniently print
-as a markdown table. Arrays of keyed tuples will usefully print as tables.
+as a markdown table. A keyed table is simple an vector of keyed tuples. They
+will usefully print as tables.
 
 ```jldoctest
 julia> using Keys, TypedBools, Base.Test
@@ -96,12 +97,24 @@ julia> @inferred merge(k, KeyedTuple((@keys c d), (3, "4")))
 
 julia> k2 = KeyedTuple((@keys a b a), (2, 3.0, "c"));
 
-julia> [k, k2]
+julia> ks = [k, k2]
 2 x 3 keyed table
 | .a | .b  | .a |
 | -- | --- | -- |
 | 1  | 2.0 | a  |
 | 2  | 3.0 | c  |
+
+julia> showall(ks)
+2 x 3 keyed table
+| .a | .b  | .a |
+| -- | --- | -- |
+| 1  | 2.0 | a  |
+| 2  | 3.0 | c  |
+
+julia> pop!(ks); pop!(ks);
+
+julia> show(ks)
+0 x 3 keyed table
 ```
 """
 struct KeyedTuple{K <: Tuple, V <: Tuple}
@@ -268,22 +281,6 @@ macro unlock(collection, keys...)
     end |> esc
 end
 
-make_keywords(e) =
-    if MacroTools.@capture e f_(args__)
-        real_args = []
-        keys = []
-        values = []
-        foreach(args) do arg
-            MacroTools.@match arg begin
-                ( key_ = value_ ) => push!(keys, key), push!(values, value)
-                any_ => push!(real_args, arg)
-            end
-        end
-        :($f($KeyedTuple(($(Key.(keys)...),), ($(values...),)), $(real_args...), ))
-    else
-        e
-    end
-
 export @keywords
 """
     @keywords(e)
@@ -304,10 +301,26 @@ julia> @keywords put_together(1, 2)
 
 julia> @keywords put_together(1, 2, left = '(', sep = ", ", right = ')')
 "(1, 2)"
+
+julia> @keywords 1
+ERROR: @keywords can only be used on function calls
 ```
 """
 macro keywords(e)
-    make_keywords(e) |> esc
+    if MacroTools.@capture e f_(args__)
+        real_args = []
+        keys = []
+        values = []
+        foreach(args) do arg
+            MacroTools.@match arg begin
+                ( key_ = value_ ) => push!(keys, key), push!(values, value)
+                any_ => push!(real_args, arg)
+            end
+        end
+        :($f($KeyedTuple(($(Key.(keys)...),), ($(values...),)), $(real_args...), )) |> esc
+    else
+        error("@keywords can only be used on function calls")
+    end
 end
 
 fix_dot(any) = any
@@ -361,7 +374,7 @@ julia> a = A(1, "c");
 
 julia> @overload_dots a.b = 2;
 
-julia> a.b
+julia> @overload_dots a.b
 2
 
 julia> k = KeyedTuple((@keys a b), (1, 2.5));
@@ -491,6 +504,9 @@ julia> @keyword_definition function test4(a, b)
 
 julia> @keywords test4(1, 2)
 3
+
+julia> @keyword_definition test5(a, b; c) = a + b + c
+ERROR: Cannot decompose assignment c
 ```
 """
 macro keyword_definition(e)
@@ -509,7 +525,6 @@ macro keyword_definition(e)
     k = gensym()
     keys = map(kwargs) do kwarg
         MacroTools.@match kwarg begin
-            key_Symbol => key
             (key_ = value_) => key
             any_ => error("Cannot decompose assignment $kwarg")
         end
