@@ -66,9 +66,8 @@ with [`@key`](@ref) or [`@keys`](@ref)). Keyed tuples can be manipulated
 in a type-stable way because the keys are directly encoded into the type.
 You can use repeated keys. `getindex` will take the last match when trying
 to index at a repeated key; for all matches, use [`match_key`](@ref)
-instead. A vector of tuples with consistent keys will conveniently print
-as a markdown table. A keyed table is simple an vector of keyed tuples. They
-will usefully print as tables.
+instead. A keyed table is simply an vector of keyed tuples all name. A keyed
+table will conveniently print as a markdown table.
 
 ```jldoctest
 julia> using Keys, TypedBools, Base.Test
@@ -115,6 +114,14 @@ julia> pop!(ks); pop!(ks);
 
 julia> show(ks)
 0 x 3 keyed table
+
+julia> long = KeyedTuple(
+            (@keys asdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdf),
+            (1,)
+        );
+
+julia> [long, long]
+2 x 1 keyed table
 ```
 """
 struct KeyedTuple{K <: Tuple, V <: Tuple}
@@ -428,46 +435,50 @@ end
 
 function Base.showarray(io::IO, t::KeyedTable, ::Bool)
     println(io, summary(t))
-    row_number, column_number = displaysize(io)
-    limit = get(io, :limit, false)
-    names = string.(type_keys(eltype(t)))
-    # subset rows for long arrays
-    subset =
-        if limit
-            t[1:min(row_number - 3, length(t))]
-        else
-            t
+    if length(t) == 0
+        nothing
+    else
+        row_number, column_number = displaysize(io)
+        limit = get(io, :limit, false)
+        names = string.(type_keys(eltype(t)))
+        # subset rows for long arrays
+        subset =
+            if limit
+                t[1:min(row_number - 3, length(t))]
+            else
+                t
+            end
+        rows = map(subset) do row
+            string.(row.values)
         end
-    rows = map(subset) do row
-        string.(row.values)
-    end
-    # find maximum widths for rows
-    row_widths = mapreduce(
-        row -> map(strwidth, row),
-        (x, y) -> map(max, x, y),
-        rows
-    )
-    # and then also for names
-    widths = map(max, map(strwidth, names), row_widths)
-    # figure out how many columns we can safely print
-    if limit
-        n = findfirst(x -> x > column_number - 2, cumsum([(widths .+ 3)...])) - 1
-        if n == -1
+        # find maximum widths for rows
+        row_widths = mapreduce(
+            row -> map(strwidth, row),
+            (x, y) -> map(max, x, y),
+            rows
+        )
+        # and then also for names
+        widths = map(max, map(strwidth, names), row_widths)
+        # figure out how many columns we can safely print
+        if limit
+            n = findfirst(x -> x > column_number - 2, cumsum([(widths .+ 3)...])) - 1
+            if n == -1
+                n = length(widths)
+            end
+        else
             n = length(widths)
         end
-    else
-        n = length(widths)
-    end
 
-    if n > 0
-        show_row(io, names, widths, n)
-        show_row(io, (Repeated("-", i) for i in [widths...][1:n]))
-        for row in rows
-            show_row(io, row, widths, n)
+        if n > 0
+            show_row(io, names, widths, n)
+            show_row(io, (Repeated("-", i) for i in [widths...][1:n]))
+            for row in rows
+                show_row(io, row, widths, n)
+            end
+            nothing
+        else
+            nothing
         end
-        nothing
-    else
-        nothing
     end
 end
 
@@ -507,6 +518,10 @@ julia> @keywords test4(1, 2)
 
 julia> @keyword_definition test5(a, b; c) = a + b + c
 ERROR: Cannot decompose assignment c
+
+julia> @keyword_definition 1
+ERROR: 1 is not a standard function definition
+[...]
 ```
 """
 macro keyword_definition(e)
@@ -519,7 +534,7 @@ macro keyword_definition(e)
         end => f, args, (), body
         (f_(args__; kwargs__) = body_) => f, args, kwargs, (body,)
         (f_(args__) = body_) => f, args, (), (body,)
-        any_ => error("$e is not in a standard function definition")
+        any_ => error("$e is not a standard function definition")
     end
 
     k = gensym()
