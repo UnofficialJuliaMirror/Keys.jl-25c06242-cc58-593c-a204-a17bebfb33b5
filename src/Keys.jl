@@ -120,14 +120,12 @@ Base.show(io::IO, k::KeyedTuple) =
         key => value
     end)
 
-function which_key(keyed_tuple, key)
-    map(
-        let key = key
-            akey -> typed(akey == key)
-        end,
-        keyed_tuple.keys
-    )
-end
+which_key(keyed_tuple, key) = map(
+    let key = key
+        akey -> typed(akey == key)
+    end,
+    keyed_tuple.keys
+)
 
 export match_key
 """
@@ -470,10 +468,29 @@ with the type-stable `@keyword` macro.
 ```jldoctest
 julia> using Keys
 
-julia> @keyword_definition test(a, b; c = 1, d = 2) = a + b + c + d;
+julia> @keyword_definition test1(a, b; c = 3, d = 4) = a + b + c + d;
 
-julia> @keywords test(1, 2, c = 3)
-8
+julia> @keywords test1(1, 2, c = 4)
+11
+
+julia> @keyword_definition test2(a, b) = a + b;
+
+julia> @keywords test2(1, 2)
+3
+
+julia> @keyword_definition function test3(a, b; c = 3, d = 4)
+            a + b + c + d
+        end;
+
+julia> @keywords test3(1, 2, c = 4)
+11
+
+julia> @keyword_definition function test4(a, b)
+            a + b
+        end;
+
+julia> @keywords test4(1, 2)
+3
 ```
 """
 macro keyword_definition(e)
@@ -485,6 +502,7 @@ macro keyword_definition(e)
             body__
         end => f, args, (), body
         (f_(args__; kwargs__) = body_) => f, args, kwargs, (body,)
+        (f_(args__) = body_) => f, args, (), (body,)
         any_ => error("$e is not in a standard function definition")
     end
 
