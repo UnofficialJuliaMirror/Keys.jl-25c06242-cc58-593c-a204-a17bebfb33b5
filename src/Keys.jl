@@ -4,26 +4,21 @@ import MacroTools
 
 using TypedBools
 using RecurUnroll
+using MappedArrays
 
-import RecurUnroll.T0
+import RecurUnroll: T0, getindex_unrolled, setindex_unrolled, mapfoldr_unrolled
 
+export Key
 struct Key{T <: Any} end
 Key(x) = Key{x}()
 
+export unkey
 unkey(::Key{T}) where T = T
 Base.Symbol(k::Key) = Symbol(unkey(k))
 
 Base.show(io::IO, ::Key{T}) where T = begin
     print(io, ".")
     print(io, T)
-end
-
-macro closure1(e::Expr)
-    if e.head != :call
-        error("Must be a function call")
-    end
-    e.args[2] = :($FastClosures.@closure $(e.args[2]))
-    esc(e)
 end
 
 export @key
@@ -72,13 +67,13 @@ in a type-stable way because the keys are directly encoded into the type.
 You can use repeated keys. `getindex` will take the last match when trying
 to index at a repeated key; for all matches, use [`match_key`](@ref)
 instead. A vector of tuples with consistent keys will conveniently print
-as a markdown table.
+as a markdown table. Arrays of keyed tuples will usefully print as tables.
 
 ```jldoctest
 julia> using Keys, TypedBools, Base.Test
 
 julia> k = KeyedTuple((@keys a b a), (1, 2.0, "a"))
-(a = 1, b = 2.0, a = "a")
+(.a = 1, .b = 2.0, .a = "a")
 
 julia> @inferred k[@key a]
 "a"
@@ -88,16 +83,25 @@ ERROR: Key .c not found
 [...]
 
 julia> @inferred k[(True(), True(), False())]
-(a = 1, b = 2.0)
+(.a = 1, .b = 2.0)
 
 julia> @inferred haskey(k, @key a)
 true
 
 julia> @inferred Base.setindex(k, 1, @key b)
-(a = 1, b = 1, a = "a")
+(.a = 1, .b = 1, .a = "a")
 
 julia> @inferred merge(k, KeyedTuple((@keys c d), (3, "4")))
-(a = 1, b = 2.0, a = "a", c = 3, d = "4")
+(.a = 1, .b = 2.0, .a = "a", .c = 3, .d = "4")
+
+julia> k2 = KeyedTuple((@keys a b a), (2, 3.0, "c"));
+
+julia> [k, k2]
+2 x 3 keyed table
+| .a | .b  | .a |
+| -- | --- | -- |
+| 1  | 2.0 | a  |
+| 2  | 3.0 | c  |
 ```
 """
 struct KeyedTuple{K <: Tuple, V <: Tuple}
@@ -106,64 +110,61 @@ struct KeyedTuple{K <: Tuple, V <: Tuple}
 end
 
 Base.show(io::IO, p::Pair{T}) where T <: Key = begin
-    print(io, Symbol(first(p)))
+    print(io, first(p))
     print(io, " = ")
     show(io, last(p))
 end
 
 Base.show(io::IO, k::KeyedTuple) =
-    show(io, roll(map(Unroll(k.keys), Unroll(k.values)) do key, value
+    show(io, map(k.keys, k.values) do key, value
         key => value
-    end))
+    end)
 
 function which_key(keyed_tuple, key)
     map(
         let key = key
             akey -> typed(akey == key)
         end,
-        Unroll(keyed_tuple.keys)
+        keyed_tuple.keys
     )
 end
 
 export match_key
 """
-    match_key(v::KeyedTuple, key)
+    match_key(keyed_tuple, key)
 
 Find all values matching key.
 
 ```jldoctest
 julia> using Keys, Base.Test
 
-julia> k = KeyedTuple((@keys a b a), (1, 2, 3))
-(a = 1, b = 2, a = 3)
+julia> k = KeyedTuple((@keys a b a), (1, "a", 1.0))
+(.a = 1, .b = "a", .a = 1.0)
 
 julia> @inferred match_key(k, @key a)
-(1, 3)
+(1, 1.0)
 ```
 """
 match_key(keyed_tuple, key) =
-    roll(Unroll(keyed_tuple.values)[which_key(keyed_tuple, key)])
+    getindex_unrolled(keyed_tuple.values, which_key(keyed_tuple, key))
 
 last_error(x, key) = last(x)
 last_error(x::T0, key) = error("Key $key not found")
 
 Base.getindex(k::KeyedTuple, key::Key) =
-    last_error((match_key(k, key)), key)
-
-function with(f, k::KeyedTuple)
-    KeyedTuple(k.keys, roll(f(Unroll(k.values))))
-end
+    last_error(match_key(k, key), key)
 
 Base.setindex(k::KeyedTuple, value, key) =
-    KeyedTuple(k.keys, roll(Base.setindex(Unroll(k.values), value, which_key(k, key))))
+    KeyedTuple(k.keys, setindex_unrolled(k.values, value, which_key(k, key)))
 
 Base.merge(k1::KeyedTuple, k2::KeyedTuple) =
     KeyedTuple((k1.keys..., k2.keys...), (k1.values..., k2.values...))
 
-Base.getindex(k::KeyedTuple, switches::Tuple) = begin
-    unrolled = Unroll(switches)
-    KeyedTuple(roll(Unroll(k.keys)[unrolled]), roll(Unroll(k.values)[unrolled]))
-end
+Base.getindex(k::KeyedTuple, switches::Tuple) =
+    KeyedTuple(
+        getindex_unrolled(k.keys, switches),
+        getindex_unrolled(k.values, switches)
+    )
 
 export delete
 """
@@ -175,13 +176,10 @@ Delete all values matching k
 julia> using Keys, Base.Test
 
 julia> @inferred delete(KeyedTuple((@keys a b), (1, 2)), @key a)
-(b = 2,)
+(.b = 2,)
 ```
 """
-delete(k::KeyedTuple, key) = begin
-    keeps = roll(map(!, which_key(k, key)))
-    k[keeps]
-end
+delete(k::KeyedTuple, key) = k[map(!, which_key(k, key))]
 
 export fieldtypes
 """
@@ -207,30 +205,30 @@ type_keys(t) = map(fieldtypes(fieldtype(t, :keys))) do key_type
 end
 type_value_types(t) = fieldtypes(fieldtype(t, :values))
 
-export structure
+export keyed_types
 """
-    structure(t)
+    keyed_types(t)
 
 Construct a keyed tuple of the keyed element types from a KeyedTuple type.
 
 ```jldoctest
 julia> using Keys, Base.Test
 
-julia> structure(typeof(KeyedTuple((@keys a b), (1, "a"))))
-(a = .Int64, b = .String)
+julia> keyed_types(typeof(KeyedTuple((@keys a b), (1, "a"))))
+(.a = .Int64, .b = .String)
 ```
 """
-structure(t) = KeyedTuple(type_keys(t), type_value_types(t))
+keyed_types(t) = KeyedTuple(type_keys(t), type_value_types(t))
 
 Base.haskey(k::KeyedTuple, key) =
-    Bool(mapreduce(akey -> typed(akey == key), |, False(), Unroll(k.keys)))
+    Bool(mapfoldr_unrolled(akey -> typed(akey == key), |, False(), k.keys))
 
 export @unlock
 """
     macro unlock(collection, keys...)
 
-Attach keys from a keyed tuple. If a key is not found, optionally specify a
-default.
+Attach keys from a keyed tuple to the local environment. If a key is not found,
+optionally specify a default.
 
 ```jldoctest
 julia> using Keys
@@ -290,7 +288,9 @@ make_keywords(e) =
 
 export @keywords
 """
-    Will transform any function call such that it is passed a keyed tuple of
+    @keywords(e)
+
+Will transform any function call such that it is passed a keyed tuple of
 keywords as the first argument.
 
 ```jldoctest
@@ -309,14 +309,14 @@ julia> @keywords put_together(1, 2, left = '(', sep = ", ", right = ')')
 ```
 """
 macro keywords(e)
-    MacroTools.postwalk(make_keywords, e) |> esc
+    make_keywords(e) |> esc
 end
 
 fix_dot(any) = any
 fix_dot(e::Expr) = MacroTools.@match e begin
     (t_.s_ = a_) => :($set_field!($t, $(Key(s)), $a))
     t_.s_ => :($get_field($t, $(Key(s))))
-    ..(t_, s_) => :($map(i -> $get_field(i, $(Key(s))), $t))
+    # ..(t_, s_) => :($mappedarray(i -> $get_field(i, $(Key(s))), $t))
     any_ => any
 end
 
@@ -347,7 +347,9 @@ export @overload_dots
 Allows for type stable dot-overloading. Walks through an expression and replaces
 `a.b` with `get_field(a, Key{:b}())` and `a.b = c` with
 `set_field!(a, c, Key{:b}())`. Overload [`get_field`](@ref) and
-[`set_field!`](@ref) for new types
+[`set_field!`](@ref) for new types. Dot overloading already defined for keyed
+tuples, and keyed tables. Dot overloading on keyed tables will return a
+mappedarray of values.
 
 ```jldoctest
 julia> using Keys, Base.Test
@@ -371,9 +373,9 @@ julia> test(k) = @overload_dots k.a + k.b;
 julia> @inferred test(k)
 3.5
 
-julia> x = [k, k];
+julia> ks = [k, k];
 
-julia> @overload_dots x..a
+julia> collect(@overload_dots ks.a)
 2-element Array{Int64,1}:
  1
  1
@@ -381,6 +383,125 @@ julia> @overload_dots x..a
 """
 macro overload_dots(e)
     esc(MacroTools.prewalk(fix_dot, e))
+end
+
+export KeyedTable
+const KeyedTable = AbstractVector{T} where T <: KeyedTuple{K, V} where V <: Tuple where K <: Tuple
+
+get_field(k::KeyedTable, key) = mappedarray(row -> getindex(row, key), k)
+
+show_row(io, atuple) = begin
+    print(io, "| ")
+    join(io, atuple, " | ")
+    println(io, " |")
+end
+
+show_row(io, atuple, widths, n) =
+    show_row(io, map(rpad, atuple, widths)[1:n])
+
+function Base.summary(t::KeyedTable)
+    "$(length(t)) x $(length(type_keys(eltype(t)))) keyed table"
+end
+
+struct Repeated
+    text::String
+    number::Int
+end
+
+function Base.show(io::IO, r::Repeated)
+    text = r.text
+    for i in 1:r.number
+        print(io, text)
+    end
+end
+
+function Base.showarray(io::IO, t::KeyedTable, ::Bool)
+    println(io, summary(t))
+    row_number, column_number = displaysize(io)
+    limit = get(io, :limit, false)
+    names = string.(type_keys(eltype(t)))
+    # subset rows for long arrays
+    subset =
+        if limit
+            t[1:min(row_number - 3, length(t))]
+        else
+            t
+        end
+    rows = map(subset) do row
+        string.(row.values)
+    end
+    # find maximum widths for rows
+    row_widths = mapreduce(
+        row -> map(strwidth, row),
+        (x, y) -> map(max, x, y),
+        rows
+    )
+    # and then also for names
+    widths = map(max, map(strwidth, names), row_widths)
+    # figure out how many columns we can safely print
+    if limit
+        n = findfirst(x -> x > column_number - 2, cumsum([(widths .+ 3)...])) - 1
+        if n == -1
+            n = length(widths)
+        end
+    else
+        n = length(widths)
+    end
+
+    if n > 0
+        show_row(io, names, widths, n)
+        show_row(io, (Repeated("-", i) for i in [widths...][1:n]))
+        for row in rows
+            show_row(io, row, widths, n)
+        end
+        nothing
+    else
+        nothing
+    end
+end
+
+export @keyword_definition
+"""
+    @keyword_definition e
+
+Transform a regular function definition with keywords such that if can be used
+with the type-stable `@keyword` macro.
+
+```jldoctest
+julia> using Keys
+
+julia> @keyword_definition test(a, b; c = 1, d = 2) = a + b + c + d;
+
+julia> @keywords test(1, 2, c = 3)
+8
+```
+"""
+macro keyword_definition(e)
+    f, args, kwargs, body = MacroTools.@match e begin
+        function f_(args__; kwargs__)
+            body__
+        end => f, args, kwargs, body
+        function f_(args__)
+            body__
+        end => f, args, (), body
+        (f_(args__; kwargs__) = body_) => f, args, kwargs, (body,)
+        any_ => error("$e is not in a standard function definition")
+    end
+
+    k = gensym()
+    keys = map(kwargs) do kwarg
+        MacroTools.@match kwarg begin
+            key_Symbol => key
+            (key_ = value_) => key
+            any_ => error("Cannot decompose assignment $kwarg")
+        end
+    end
+    quote
+        function $f($k::$KeyedTuple, $(args...))
+            $Keys.@unlock $k $(kwargs...)
+            $(body...)
+        end
+    end |> esc
 end
 
 end
