@@ -55,6 +55,7 @@ function Base.show(io::IO, k::Keyed{K}) where K
     print(io, " = ")
     show(io, k.value)
 end
+KeyedTuple(; args...) = KeyedTuple(args)
 
 value(k::Keyed) = k.value
 
