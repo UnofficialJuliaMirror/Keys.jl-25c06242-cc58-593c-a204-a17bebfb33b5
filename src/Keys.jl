@@ -152,7 +152,7 @@ julia> @inferred delete(keyed_tuple(a = 1, b = 2.0), Key(:b))
 ```
 """
 delete(keyed_tuple::KeyedTuple, key::Key) =
-    getindex_unrolled(keyed_tuple, map(!, which_key(keyed_tuple, key)))
+    getindex_unrolled(keyed_tuple, map(not, which_key(keyed_tuple, key)))
 
 export push
 """
@@ -179,7 +179,7 @@ push(k::KeyedTuple; args...) = (k..., keyed_tuple(args))
     """
     keyed_tuple(n::NamedTuple) = map(
         let n = n
-            key -> (Key(key), getproperty(n, key))
+            key -> (Key(key), Base.getproperty(n, key))
         end,
         keys(n)
     )
