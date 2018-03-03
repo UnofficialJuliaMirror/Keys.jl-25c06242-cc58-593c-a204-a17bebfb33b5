@@ -1,6 +1,5 @@
 module Keys
 
-import MacroTools
 import RecurUnroll
 import RecurUnroll: getindex_unrolled
 import TypedBools
@@ -75,7 +74,7 @@ A tuple with only [`Keyed`](@ref) values.
 """
 const KeyedTuple = NTuple{N, Keyed} where N
 
-@noinline keyed_tuple(v::AbstractVector) = (map(keyed, v)...)
+@noinline keyed_tuple(v::AbstractVector) = (map(keyed, v)...,)
 
 export keyed_tuple
 """
@@ -188,7 +187,6 @@ push(k::KeyedTuple; args...) = (k..., keyed_tuple(args))
     keyed_tuple(b::Base.Iterators.Pairs) =
         keyed_tuple(b.data)
 
-    push(k::KeyedTuple; args...) = (k..., keyed_tuple(args...))
     Base.getproperty(key::KeyedTuple, s::Symbol) = getindex(key, Key(s))
 end
 
