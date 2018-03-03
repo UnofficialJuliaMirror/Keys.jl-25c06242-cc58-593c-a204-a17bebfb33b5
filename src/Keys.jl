@@ -87,10 +87,18 @@ keys are allowed; will return the first match.
 ```jldoctest
 julia> using Keys, Base.Test
 
-julia> k = keyed_tuple(a = 1, b = 1.0)
+julia> k = if VERSION > v"0.6.2"
+            @inferred keyed_tuple(a = 1, b = 1.0)
+        else
+            keyed_tuple(a = 1, b = 1.0)
+        end
 ((.a, 1), (.b, 1.0))
 
-julia> @inferred k[Key(:b)]
+julia> if VERSION > v"0.6.2"
+            @inferred (k -> k.b)(k)
+        else
+            @inferred k[Key(:b)]
+        end
 1.0
 
 julia> k[Key(:c)]
@@ -106,7 +114,7 @@ julia> @inferred Base.setindex(k, 1//1, Key(:b))
 julia> if VERSION > v"0.6.2"
             @inferred (k -> k.b)(k)
         else
-            2.0
+            @inferred k[Key(:b)]
         end
 2.0
 ```
@@ -170,13 +178,6 @@ julia> push(keyed_tuple(a = 1, b = 1.0), c = 1 // 1)
 push(k::KeyedTuple; args...) = (k..., keyed_tuple(args))
 
 @static if VERSION > v"0.6.2"
-    """
-    ```jldoctest
-    julia> using Keys, Base.Test
-
-    julia> @inferred keyed_tuple(a = 1, b = 1.0)
-    ```
-    """
     keyed_tuple(n::NamedTuple) = map(
         let n = n
             key -> (Key(key), Base.getproperty(n, key))
