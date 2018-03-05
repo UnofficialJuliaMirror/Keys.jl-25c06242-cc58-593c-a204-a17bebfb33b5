@@ -1,11 +1,17 @@
 module Keys
 
 import RecurUnroll
-import RecurUnroll: getindex_unrolled
+import RecurUnroll: getindex_unrolled, reduce_unrolled
 import TypedBools
+import DataFrames
 
 export Key
 struct Key{K} end
+
+const SomeKeys = NTuple{N, Key} where N
+const KeyOrKeys = Union{Key, SomeKeys}
+
+# x = keyed_table(a = [1, 2], b = ["a", "b"])
 
 """
     Key(s::Symbol)
@@ -72,7 +78,48 @@ export KeyedTuple
 
 A tuple with only [`Keyed`](@ref) values.
 """
-const KeyedTuple = NTuple{N, Keyed} where N
+const KeyedTuple = Union{
+    NTuple{1, Keyed},
+    NTuple{2, Keyed},
+    NTuple{3, Keyed},
+    NTuple{4, Keyed},
+    NTuple{5, Keyed},
+    NTuple{6, Keyed},
+    NTuple{7, Keyed},
+    NTuple{8, Keyed},
+    NTuple{9, Keyed},
+    NTuple{10, Keyed},
+    NTuple{11, Keyed},
+    NTuple{12, Keyed},
+    NTuple{13, Keyed},
+    NTuple{14, Keyed},
+    NTuple{15, Keyed},
+    NTuple{16, Keyed}
+}
+
+# hack into dataframe printing
+struct PrintWrapper{T} <: DataFrames.AbstractDataFrame
+    x::T
+end
+
+DataFrames.eachcol(p::PrintWrapper) = p.x
+DataFrames.nrow(p::PrintWrapper) =
+    max(map(keyed -> length(value(keyed)), p.x)...)
+DataFrames.ncol(p::PrintWrapper) = length(p.x)
+DataFrames._names(p::PrintWrapper) = map(key, p.x)
+Base.getindex(p::PrintWrapper, j) = value(p.x[j])
+Base.getindex(p::PrintWrapper, i, j) = getindex(p, j)[i]
+
+function Base.summary(p::PrintWrapper) # -> String
+    nrows, ncols = size(p)
+    return @sprintf("%d×%d %s", nrows, ncols, "KeyedTuple")
+end
+
+# technically type piracy
+DataFrames.isna(a1, a2) = false
+
+Base.show(io::IO, k::KeyedTuple) =
+    show(io, PrintWrapper(map_values(collect, k)), true, :Row, false)
 
 @noinline keyed_tuple(v::AbstractVector) = (map(keyed, v)...,)
 
@@ -92,7 +139,9 @@ julia> k = if VERSION > v"0.6.2"
         else
             keyed_tuple(a = 1, b = 1.0)
         end
-((.a, 1), (.b, 1.0))
+│ Row │ .a │ .b  │
+├─────┼────┼─────┤
+│ 1   │ 1  │ 1.0 │
 
 julia> if VERSION > v"0.6.2"
             @inferred (k -> k.b)(k)
@@ -100,6 +149,11 @@ julia> if VERSION > v"0.6.2"
             @inferred k[Key(:b)]
         end
 1.0
+
+julia> @inferred getindex(k, (Key(:a), Key(:b)))
+│ Row │ .a │ .b  │
+├─────┼────┼─────┤
+│ 1   │ 1  │ 1.0 │
 
 julia> k[Key(:c)]
 ERROR: Key .c not found
@@ -109,14 +163,9 @@ julia> @inferred haskey(k, Key(:b))
 TypedBools.True()
 
 julia> @inferred Base.setindex(k, 1//1, Key(:b))
-((.a, 1), (.b, 1//1))
-
-julia> if VERSION > v"0.6.2"
-            @inferred (k -> k.b)(k)
-        else
-            @inferred k[Key(:b)]
-        end
-2.0
+│ Row │ .a │ .b   │
+├─────┼────┼──────┤
+│ 1   │ 1  │ 1//1 │
 ```
 """
 keyed_tuple(; args...) = keyed_tuple(args)
@@ -124,26 +173,44 @@ keyed_tuple(; args...) = keyed_tuple(args)
 match_key(::Keyed{K}, ::Key{K}) where K = TypedBools.True()
 match_key(::Keyed, ::Key) = TypedBools.False()
 
-first_error(::Tuple{}, key::Key) = error("Key $key not found")
-first_error(keyed_tuple::KeyedTuple, key::Key) = value(first(keyed_tuple))
+# import Base: |
 
-which_key(keyed_tuple::KeyedTuple, key::Key) = map(
+match_key(keyed::Keyed, keys::SomeKeys) = reduce_unrolled(|, map(
+    let keyed = keyed
+        key -> match_key(keyed, key)
+    end,
+    keys
+))
+
+first_error(::Tuple{}, key::Key) = error("Key $key not found")
+first_error(a_keyed_tuple::KeyedTuple, key::Key) = value(first(a_keyed_tuple))
+
+which_key(a_keyed_tuple::KeyedTuple, key::KeyOrKeys) = map(
     let key = key
         keyed -> match_key(keyed, key)
     end,
-    keyed_tuple
+    a_keyed_tuple
 )
 
-Base.getindex(keyed_tuple::KeyedTuple, key::Key) =
-    first_error(getindex_unrolled(keyed_tuple, which_key(keyed_tuple, key)), key)
+_getindex(a_keyed_tuple, keys) =
+    getindex_unrolled(a_keyed_tuple, which_key(a_keyed_tuple, keys))
 
-Base.haskey(keyed_tuple::KeyedTuple, key::Key) = RecurUnroll.reduce_unrolled(|, which_key(keyed_tuple, key))
+Base.getindex(a_keyed_tuple::KeyedTuple, key::Key) =
+    first_error(_getindex(a_keyed_tuple, key), key)
 
-Base.setindex(keyed_tuple::KeyedTuple, avalue, key::Key) = map(
+#Base.getindex(a_keyed_tuple::KeyedTuple, row, key::Key) =
+#    getindex(a_keyed_tuple[key], row)
+
+Base.getindex(a_keyed_tuple::KeyedTuple, keys::SomeKeys) =
+    _getindex(a_keyed_tuple, keys)
+
+Base.haskey(a_keyed_tuple::KeyedTuple, key::Key) = RecurUnroll.reduce_unrolled(|, which_key(a_keyed_tuple, key))
+
+Base.setindex(a_keyed_tuple::KeyedTuple, avalue, key::Key) = map(
     let key = key, avalue = avalue
         keyed -> ifelse(match_key(keyed, key), (key, avalue), keyed)
     end,
-    keyed_tuple
+    a_keyed_tuple
 )
 
 export delete
@@ -156,11 +223,18 @@ Delete all values matching key
 julia> using Keys, Base.Test
 
 julia> @inferred delete(keyed_tuple(a = 1, b = 2.0), Key(:b))
-((.a, 1),)
+│ Row │ .a │
+├─────┼────┤
+│ 1   │ 1  │
+
+julia> @inferred delete(keyed_tuple(a = 1, b = 2.0), (Key(:a), Key(:b)))
+()
 ```
 """
-delete(keyed_tuple::KeyedTuple, key::Key) =
-    getindex_unrolled(keyed_tuple, map(not, which_key(keyed_tuple, key)))
+delete(a_keyed_tuple::KeyedTuple, key::KeyOrKeys) =
+    getindex_unrolled(a_keyed_tuple, map(
+        TypedBools.not,
+        which_key(a_keyed_tuple, key)))
 
 export push
 """
@@ -172,10 +246,12 @@ Add keys to a [`KeyedTuple`](@ref).
 julia> using Keys
 
 julia> push(keyed_tuple(a = 1, b = 1.0), c = 1 // 1)
-((.a, 1), (.b, 1.0), ((.c, 1//1),))
+│ Row │ .a │ .b  │ .c   │
+├─────┼────┼─────┼──────┤
+│ 1   │ 1  │ 1.0 │ 1//1 │
 ```
 """
-push(k::KeyedTuple; args...) = (k..., keyed_tuple(args))
+push(k::KeyedTuple; args...) = (k..., keyed_tuple(args)...)
 
 @static if VERSION > v"0.6.2"
     keyed_tuple(n::NamedTuple) = map(
@@ -201,7 +277,9 @@ Map f over the values of a keyed tuple.
 julia> using Keys, Base.Test
 
 julia> @inferred map_values(x -> x + 1, keyed_tuple(a = 1, b = 1.0))
-((.a, 2), (.b, 2.0))
+│ Row │ .a │ .b  │
+├─────┼────┼─────┤
+│ 1   │ 2  │ 2.0 │
 ```
 """
 map_values(f, k::KeyedTuple) = map(
