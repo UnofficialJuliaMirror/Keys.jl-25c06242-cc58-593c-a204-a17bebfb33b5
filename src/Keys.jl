@@ -105,8 +105,6 @@ struct PrintWrapper{T} <: DataFrames.AbstractDataFrame
     x::T
 end
 
-p = PrintWrapper(keyed_tuple(a = 1, b = 2))
-
 DataFrames.nrow(p::PrintWrapper) =
     max(map(keyed -> length(value(keyed)), p.x)...)
 DataFrames.ncol(p::PrintWrapper) = length(p.x)
@@ -170,8 +168,6 @@ keyed_tuple(; args...) = keyed_tuple(args)
 
 match_key(::Keyed{K}, ::Key{K}) where K = TypedBools.True()
 match_key(::Keyed, ::Key) = TypedBools.False()
-
-# import Base: |
 
 match_key(keyed::Keyed, keys::SomeKeys) = reduce_unrolled(|, map(
     let keyed = keyed
