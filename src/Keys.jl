@@ -97,9 +97,6 @@ const KeyedTuple = Union{
     NTuple{16, Keyed}
 }
 
-
-Base.collect(k::KeyedTuple) = map_values(collect, k)
-
 # hack into dataframe printing
 struct PrintWrapper{T} <: DataFrames.AbstractDataFrame
     x::T
