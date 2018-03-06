@@ -97,27 +97,22 @@ const KeyedTuple = Union{
     NTuple{16, Keyed}
 }
 
+
+Base.collect(k::KeyedTuple) = map_values(collect, k)
+
 # hack into dataframe printing
 struct PrintWrapper{T} <: DataFrames.AbstractDataFrame
     x::T
 end
 
-DataFrames.eachcol(p::PrintWrapper) = p.x
+p = PrintWrapper(keyed_tuple(a = 1, b = 2))
+
 DataFrames.nrow(p::PrintWrapper) =
     max(map(keyed -> length(value(keyed)), p.x)...)
 DataFrames.ncol(p::PrintWrapper) = length(p.x)
 DataFrames._names(p::PrintWrapper) = map(key, p.x)
 Base.getindex(p::PrintWrapper, j) = value(p.x[j])
 Base.getindex(p::PrintWrapper, i, j) = getindex(p, j)[i]
-Base.collect(k::KeyedTuple) = map_values(collect, k)
-
-function Base.summary(p::PrintWrapper) # -> String
-    nrows, ncols = size(p)
-    return @sprintf("%d×%d %s", nrows, ncols, "KeyedTuple")
-end
-
-# technically type piracy
-DataFrames.isna(a1, a2) = false
 
 function Base.show(io::IO, k::KeyedTuple)
     print(io, '\n')
