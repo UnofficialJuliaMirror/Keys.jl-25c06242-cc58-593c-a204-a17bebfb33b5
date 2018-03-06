@@ -109,6 +109,7 @@ DataFrames.ncol(p::PrintWrapper) = length(p.x)
 DataFrames._names(p::PrintWrapper) = map(key, p.x)
 Base.getindex(p::PrintWrapper, j) = value(p.x[j])
 Base.getindex(p::PrintWrapper, i, j) = getindex(p, j)[i]
+Base.collect(k::KeyedTuple) = map_values(collect, k)
 
 function Base.summary(p::PrintWrapper) # -> String
     nrows, ncols = size(p)
@@ -118,8 +119,10 @@ end
 # technically type piracy
 DataFrames.isna(a1, a2) = false
 
-Base.show(io::IO, k::KeyedTuple) =
+function Base.show(io::IO, k::KeyedTuple)
+    print(io, '\n')
     show(io, PrintWrapper(map_values(collect, k)), true, :Row, false)
+end
 
 @noinline keyed_tuple(v::AbstractVector) = (map(keyed, v)...,)
 
