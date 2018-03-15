@@ -3,29 +3,23 @@ module Keys
 import RecurUnroll
 import RecurUnroll: getindex_unrolled, reduce_unrolled
 import TypedBools
+import TypedBools: not
 import DataFrames
+import Base: getindex, setindex, haskey
 
-export Key
 struct Key{K} end
 
-const SomeKeys = NTuple{N, Key} where N
+const Some{T} = NTuple{N, T} where N
+
+const SomeKeys = Some{Key}
 const KeyOrKeys = Union{Key, SomeKeys}
 
-# x = keyed_table(a = [1, 2], b = ["a", "b"])
+Key(s::Symbol) = Key{s}()
 
-"""
-    Key(s::Symbol)
+const SymbolOrSymbols = Union{Symbol, Some{Symbol}}
 
-A key used for indexing.
-
-```jldoctest
-julia> using Keys, Base.Test
-
-julia> @inferred (() -> Key(:a))()
-.a
-```
-"""
-Base.@pure Key(s::Symbol) = Key{s}()
+to_keys(s::Symbol) = Key(s)
+to_keys(ss::Some{Symbol}) = map(Key, ss)
 
 function Base.show(io::IO, key::Key{K}) where K
     print(io, ".")
@@ -47,9 +41,9 @@ export key
 Get the key of a [`Keyed`](@ref) value.
 
 ```jldoctest
-julia> using Keys, Base.Test
+julia> using Keys
 
-julia> @inferred map(key, keyed_tuple(a = 1, b = 2.0))
+julia> map(key, keyed_tuple(a = 1, b = 2.0))
 (.a, .b)
 ```
 """
@@ -62,9 +56,9 @@ export value
 Get the value of a [`Keyed`](@ref) value.
 
 ```jldoctest
-julia> using Keys, Base.Test
+julia> using Keys
 
-julia> @inferred map(value, keyed_tuple(a = 1, b = 1.0))
+julia> map(value, keyed_tuple(a = 1, b = 1.0))
 (1, 1.0)
 ```
 """
@@ -106,8 +100,8 @@ DataFrames.nrow(p::PrintWrapper) =
     max(map(keyed -> length(value(keyed)), p.x)...)
 DataFrames.ncol(p::PrintWrapper) = length(p.x)
 DataFrames._names(p::PrintWrapper) = map(key, p.x)
-Base.getindex(p::PrintWrapper, j) = value(p.x[j])
-Base.getindex(p::PrintWrapper, i, j) = getindex(p, j)[i]
+getindex(p::PrintWrapper, j) = value(p.x[j])
+getindex(p::PrintWrapper, i, j) = getindex(p, j)[i]
 
 function Base.show(io::IO, k::KeyedTuple)
     print(io, '\n')
@@ -120,48 +114,47 @@ export keyed_tuple
 """
     keyed_tuple(; args...)
 
-Construct a [`KeyedTuple`](@ref). You can index them with [`Key`](@ref)s as
+Construct a [`KeyedTuple`](@ref). You can index them with [`@k_str`](@ref)s as
 if they were a Dict. On 0.7, you can also access values with `.`. Duplicated
 keys are allowed; will return the first match.
 
 ```jldoctest
-julia> using Keys, Base.Test
+julia> using Keys
 
-julia> k = if VERSION > v"0.6.2"
-            @inferred keyed_tuple(a = 1, b = 1.0)
-        else
-            keyed_tuple(a = 1, b = 1.0)
-        end
+julia> k = keyed_tuple(a = 1, b = 1.0)
 │ Row │ .a │ .b  │
 ├─────┼────┼─────┤
 │ 1   │ 1  │ 1.0 │
 
 julia> if VERSION > v"0.6.2"
-            @inferred (k -> k.b)(k)
+            k.b
         else
-            @inferred k[Key(:b)]
+            k[:b]
         end
 1.0
 
-julia> @inferred getindex(k, (Key(:a), Key(:b)))
+julia> getindex(k, (:a, :b))
 │ Row │ .a │ .b  │
 ├─────┼────┼─────┤
 │ 1   │ 1  │ 1.0 │
 
-julia> k[Key(:c)]
+julia> k[:c]
 ERROR: Key .c not found
 [...]
 
-julia> @inferred haskey(k, Key(:b))
+julia> haskey(k, :b)
 TypedBools.True()
 
-julia> @inferred Base.setindex(k, 1//1, Key(:b))
+julia> Base.setindex(k, 1//1, :b)
 │ Row │ .a │ .b   │
 ├─────┼────┼──────┤
 │ 1   │ 1  │ 1//1 │
 ```
 """
 keyed_tuple(; args...) = keyed_tuple(args)
+
+keyed_tuple(d::DataFrames.DataFrame) =
+    (tuple.(Key.(d.colindex.names), d.columns)...,)
 
 match_key(::Keyed{K}, ::Key{K}) where K = TypedBools.True()
 match_key(::Keyed, ::Key) = TypedBools.False()
@@ -186,23 +179,29 @@ which_key(a_keyed_tuple::KeyedTuple, key::KeyOrKeys) = map(
 _getindex(a_keyed_tuple, keys) =
     getindex_unrolled(a_keyed_tuple, which_key(a_keyed_tuple, keys))
 
-Base.getindex(a_keyed_tuple::KeyedTuple, key::Key) =
+getindex(a_keyed_tuple::KeyedTuple, key::Key) =
     first_error(_getindex(a_keyed_tuple, key), key)
 
-#Base.getindex(a_keyed_tuple::KeyedTuple, row, key::Key) =
-#    getindex(a_keyed_tuple[key], row)
-
-Base.getindex(a_keyed_tuple::KeyedTuple, keys::SomeKeys) =
+getindex(a_keyed_tuple::KeyedTuple, keys::SomeKeys) =
     _getindex(a_keyed_tuple, keys)
 
-Base.haskey(a_keyed_tuple::KeyedTuple, key::Key) = RecurUnroll.reduce_unrolled(|, which_key(a_keyed_tuple, key))
+getindex(a_keyed_tuple::KeyedTuple, ss::SymbolOrSymbols) =
+    getindex(a_keyed_tuple, to_keys(ss))
 
-Base.setindex(a_keyed_tuple::KeyedTuple, avalue, key::Key) = map(
+haskey(a_keyed_tuple::KeyedTuple, key::Key) =
+    reduce_unrolled(|, which_key(a_keyed_tuple, key))
+
+haskey(a_keyed_tuple::KeyedTuple, s::Symbol) =
+    haskey(a_keyed_tuple, to_keys(s))
+
+setindex(a_keyed_tuple::KeyedTuple, avalue, key::Key) = map(
     let key = key, avalue = avalue
         keyed -> ifelse(match_key(keyed, key), (key, avalue), keyed)
     end,
     a_keyed_tuple
 )
+setindex(a_keyed_tuple::KeyedTuple, avalue, s::Symbol) =
+    setindex(a_keyed_tuple, avalue, to_keys(s))
 
 export delete
 """
@@ -211,38 +210,44 @@ export delete
 Delete all values matching key
 
 ```jldoctest
-julia> using Keys, Base.Test
+julia> using Keys
 
-julia> @inferred delete(keyed_tuple(a = 1, b = 2.0), Key(:b))
+julia> delete(keyed_tuple(a = 1, b = 2.0), :b)
 │ Row │ .a │
 ├─────┼────┤
 │ 1   │ 1  │
 
-julia> @inferred delete(keyed_tuple(a = 1, b = 2.0), (Key(:a), Key(:b)))
+julia> delete(keyed_tuple(a = 1, b = 2.0), (:a, :b))
 ()
 ```
 """
-delete(a_keyed_tuple::KeyedTuple, key::KeyOrKeys) =
+delete(a_keyed_tuple::KeyedTuple, keys::KeyOrKeys) =
     getindex_unrolled(a_keyed_tuple, map(
-        TypedBools.not,
-        which_key(a_keyed_tuple, key)))
+        not,
+        which_key(a_keyed_tuple, keys)))
+
+delete(a_keyed_tuple::KeyedTuple, ss::SymbolOrSymbols) =
+    delete(a_keyed_tuple, to_keys(ss))
 
 export push
 """
     push(k::KeyedTuple; args...)
 
-Add keys to a [`KeyedTuple`](@ref).
+Add keys to a [`KeyedTuple`](@ref). Will overwrite keys.
 
 ```jldoctest
 julia> using Keys
 
-julia> push(keyed_tuple(a = 1, b = 1.0), c = 1 // 1)
+julia> push(keyed_tuple(a = 1, b = 1.0), b = "a", c = 1 // 1)
 │ Row │ .a │ .b  │ .c   │
 ├─────┼────┼─────┼──────┤
-│ 1   │ 1  │ 1.0 │ 1//1 │
+│ 1   │ 1  │ 'a' │ 1//1 │
 ```
 """
-push(k::KeyedTuple; args...) = (k..., keyed_tuple(args)...)
+function push(k::KeyedTuple; args...)
+    add = keyed_tuple(args)
+    delete(k, key.(add))..., add...
+end
 
 @static if VERSION > v"0.6.2"
     keyed_tuple(n::NamedTuple) = map(
@@ -265,9 +270,9 @@ export map_values
 Map f over the values of a keyed tuple.
 
 ```jldoctest
-julia> using Keys, Base.Test
+julia> using Keys
 
-julia> @inferred map_values(x -> x + 1, keyed_tuple(a = 1, b = 1.0))
+julia> map_values(x -> x + 1, keyed_tuple(a = 1, b = 1.0))
 │ Row │ .a │ .b  │
 ├─────┼────┼─────┤
 │ 1   │ 2  │ 2.0 │
@@ -279,5 +284,7 @@ map_values(f, k::KeyedTuple) = map(
     end,
     k
 )
+
+unkey(::Key{T} where T) = T
 
 end
