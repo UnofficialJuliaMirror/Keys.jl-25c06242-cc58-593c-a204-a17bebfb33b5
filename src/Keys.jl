@@ -1,11 +1,8 @@
 module Keys
 
-import RecurUnroll
 import RecurUnroll: getindex_unrolled, reduce_unrolled
-import TypedBools
-import TypedBools: not
-import DataFrames
-import Base: getindex, setindex, haskey
+import TypedBools: True, False, not
+import Base: getindex, haskey, @pure
 
 struct Key{K} end
 
@@ -64,8 +61,6 @@ julia> map(value, keyed_tuple(a = 1, b = 1.0))
 """
 value(k::Keyed) = k[2]
 
-keyed(t::Tuple{A, B} where {A <: Symbol, B}) = (Key(t[1]), t[2])
-
 export KeyedTuple
 """
     const KeyedTuple
@@ -91,30 +86,14 @@ const KeyedTuple = Union{
     NTuple{16, Keyed}
 }
 
-# hack into dataframe printing
-struct PrintWrapper{T} <: DataFrames.AbstractDataFrame
-    x::T
-end
-
-DataFrames.nrow(p::PrintWrapper) =
-    max(map(keyed -> length(value(keyed)), p.x)...)
-DataFrames.ncol(p::PrintWrapper) = length(p.x)
-DataFrames._names(p::PrintWrapper) = map(key, p.x)
-getindex(p::PrintWrapper, j) = value(p.x[j])
-getindex(p::PrintWrapper, i, j) = getindex(p, j)[i]
-
-function Base.show(io::IO, k::KeyedTuple)
-    print(io, '\n')
-    show(io, PrintWrapper(map_values(collect, k)), true, :Row, false)
-end
-
-@noinline keyed_tuple(v::AbstractVector) = (map(keyed, v)...,)
+keyed(t::Tuple{A, B} where {A <: Symbol, B}) = (Key(t[1]), t[2])
+keyed_tuple(v::AbstractVector) = (map(keyed, v)...,)
 
 export keyed_tuple
 """
     keyed_tuple(; args...)
 
-Construct a [`KeyedTuple`](@ref). You can index them with [`@k_str`](@ref)s as
+Construct a [`KeyedTuple`](@ref). You can index them with symbols as
 if they were a Dict. On 0.7, you can also access values with `.`. Duplicated
 keys are allowed; will return the first match.
 
@@ -122,9 +101,7 @@ keys are allowed; will return the first match.
 julia> using Keys
 
 julia> k = keyed_tuple(a = 1, b = 1.0)
-│ Row │ .a │ .b  │
-├─────┼────┼─────┤
-│ 1   │ 1  │ 1.0 │
+((.a, 1), (.b, 1.0))
 
 julia> if VERSION > v"0.6.2"
             k.b
@@ -134,9 +111,7 @@ julia> if VERSION > v"0.6.2"
 1.0
 
 julia> getindex(k, (:a, :b))
-│ Row │ .a │ .b  │
-├─────┼────┼─────┤
-│ 1   │ 1  │ 1.0 │
+((.a, 1), (.b, 1.0))
 
 julia> k[:c]
 ERROR: Key .c not found
@@ -144,20 +119,12 @@ ERROR: Key .c not found
 
 julia> haskey(k, :b)
 TypedBools.True()
-
-julia> Base.setindex(k, 1//1, :b)
-│ Row │ .a │ .b   │
-├─────┼────┼──────┤
-│ 1   │ 1  │ 1//1 │
 ```
 """
 keyed_tuple(; args...) = keyed_tuple(args)
 
-keyed_tuple(d::DataFrames.DataFrame) =
-    (tuple.(Key.(d.colindex.names), d.columns)...,)
-
-match_key(::Keyed{K}, ::Key{K}) where K = TypedBools.True()
-match_key(::Keyed, ::Key) = TypedBools.False()
+match_key(::Keyed{K}, ::Key{K}) where K = True()
+match_key(::Keyed, ::Key) = False()
 
 match_key(keyed::Keyed, keys::SomeKeys) = reduce_unrolled(|, map(
     let keyed = keyed
@@ -185,23 +152,14 @@ getindex(a_keyed_tuple::KeyedTuple, key::Key) =
 getindex(a_keyed_tuple::KeyedTuple, keys::SomeKeys) =
     _getindex(a_keyed_tuple, keys)
 
-getindex(a_keyed_tuple::KeyedTuple, ss::SymbolOrSymbols) =
+@inline getindex(a_keyed_tuple::KeyedTuple, ss::SymbolOrSymbols) =
     getindex(a_keyed_tuple, to_keys(ss))
 
 haskey(a_keyed_tuple::KeyedTuple, key::Key) =
     reduce_unrolled(|, which_key(a_keyed_tuple, key))
 
-haskey(a_keyed_tuple::KeyedTuple, s::Symbol) =
-    haskey(a_keyed_tuple, to_keys(s))
-
-setindex(a_keyed_tuple::KeyedTuple, avalue, key::Key) = map(
-    let key = key, avalue = avalue
-        keyed -> ifelse(match_key(keyed, key), (key, avalue), keyed)
-    end,
-    a_keyed_tuple
-)
-setindex(a_keyed_tuple::KeyedTuple, avalue, s::Symbol) =
-    setindex(a_keyed_tuple, avalue, to_keys(s))
+@inline haskey(a_keyed_tuple::KeyedTuple, s::Symbol) =
+    haskey(a_keyed_tuple, Key(s))
 
 export delete
 """
@@ -213,9 +171,7 @@ Delete all values matching key
 julia> using Keys
 
 julia> delete(keyed_tuple(a = 1, b = 2.0), :b)
-│ Row │ .a │
-├─────┼────┤
-│ 1   │ 1  │
+((.a, 1),)
 
 julia> delete(keyed_tuple(a = 1, b = 2.0), (:a, :b))
 ()
@@ -226,7 +182,7 @@ delete(a_keyed_tuple::KeyedTuple, keys::KeyOrKeys) =
         not,
         which_key(a_keyed_tuple, keys)))
 
-delete(a_keyed_tuple::KeyedTuple, ss::SymbolOrSymbols) =
+@inline delete(a_keyed_tuple::KeyedTuple, ss::SymbolOrSymbols) =
     delete(a_keyed_tuple, to_keys(ss))
 
 export push
@@ -239,9 +195,7 @@ Add keys to a [`KeyedTuple`](@ref). Will overwrite keys.
 julia> using Keys
 
 julia> push(keyed_tuple(a = 1, b = 1.0), b = "a", c = 1 // 1)
-│ Row │ .a │ .b  │ .c   │
-├─────┼────┼─────┼──────┤
-│ 1   │ 1  │ 'a' │ 1//1 │
+((.a, 1), (.b, "a"), (.c, 1//1))
 ```
 """
 function push(k::KeyedTuple; args...)
@@ -260,7 +214,7 @@ end
     keyed_tuple(b::Base.Iterators.Pairs) =
         keyed_tuple(b.data)
 
-    Base.getproperty(key::KeyedTuple, s::Symbol) = getindex(key, Key(s))
+    @inline Base.getproperty(key::KeyedTuple, s::Symbol) = getindex(key, Key(s))
 end
 
 export map_values
@@ -273,9 +227,7 @@ Map f over the values of a keyed tuple.
 julia> using Keys
 
 julia> map_values(x -> x + 1, keyed_tuple(a = 1, b = 1.0))
-│ Row │ .a │ .b  │
-├─────┼────┼─────┤
-│ 1   │ 2  │ 2.0 │
+((.a, 2), (.b, 2.0))
 ```
 """
 map_values(f, k::KeyedTuple) = map(
