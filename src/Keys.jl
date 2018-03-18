@@ -11,25 +11,24 @@ const Some{T} = NTuple{N, T} where N
 const SomeKeys = Some{Key}
 const KeyOrKeys = Union{Key, SomeKeys}
 
-Key(s::Symbol) = Key{s}()
+@inline Key(s::Symbol) = Key{s}()
 
 const SymbolOrSymbols = Union{Symbol, Some{Symbol}}
 
-to_keys(s::Symbol) = Key(s)
-to_keys(ss::Some{Symbol}) = map(Key, ss)
+@inline to_keys(s::Symbol) = Key(s)
+@inline to_keys(ss::Some{Symbol}) = map(Key, ss)
 
 function Base.show(io::IO, key::Key{K}) where K
     print(io, ".")
     print(io, K)
 end
 
-export Keyed
-"""
-    const Keyed{K}
+struct Keyed{K, V}
+    value::V
+end
 
-A keyed value
-"""
-const Keyed{K} = Tuple{Key{K}, V} where {K, V}
+Keyed{K}(v::V) where {K, V} = Keyed{K, V}(v)
+Keyed(k::Key{K}, value::V) where {K, V} = Keyed{K, V}(value)
 
 export key
 """
@@ -44,7 +43,7 @@ julia> map(key, keyed_tuple(a = 1, b = 2.0))
 (.a, .b)
 ```
 """
-key(k::Keyed) = k[1]
+key(k::Keyed{K}) where K = Key{K}()
 
 export value
 """
@@ -59,7 +58,13 @@ julia> map(value, keyed_tuple(a = 1, b = 1.0))
 (1, 1.0)
 ```
 """
-value(k::Keyed) = k[2]
+value(k::Keyed) = k.value
+
+function Base.show(io::IO, k::Keyed{K}) where K
+    print(io, K)
+    print(io, " = ")
+    show(io, value(k))
+end
 
 export KeyedTuple
 """
@@ -86,8 +91,8 @@ const KeyedTuple = Union{
     NTuple{16, Keyed}
 }
 
-keyed(t::Tuple{A, B} where {A <: Symbol, B}) = (Key(t[1]), t[2])
-keyed_tuple(v::AbstractVector) = (map(keyed, v)...,)
+Keyed(t::Tuple{A, B}) where {A <: Symbol, B} = Keyed{t[1], B}(t[2])
+keyed_tuple(v::AbstractVector) = (map(Keyed, v)...,)
 
 export keyed_tuple
 """
@@ -111,7 +116,7 @@ julia> if VERSION > v"0.6.2"
 1.0
 
 julia> getindex(k, (:a, :b))
-((.a, 1), (.b, 1.0))
+(a = 1, b = 1.0)
 
 julia> k[:c]
 ERROR: Key .c not found
@@ -171,7 +176,7 @@ Delete all values matching key
 julia> using Keys
 
 julia> delete(keyed_tuple(a = 1, b = 2.0), :b)
-((.a, 1),)
+(a = 1,)
 
 julia> delete(keyed_tuple(a = 1, b = 2.0), (:a, :b))
 ()
@@ -195,7 +200,7 @@ Add keys to a [`KeyedTuple`](@ref). Will overwrite keys.
 julia> using Keys
 
 julia> push(keyed_tuple(a = 1, b = 1.0), b = "a", c = 1 // 1)
-((.a, 1), (.b, "a"), (.c, 1//1))
+(a = 1, b = "a", c = 1//1)
 ```
 """
 function push(k::KeyedTuple; args...)
@@ -203,7 +208,7 @@ function push(k::KeyedTuple; args...)
     delete(k, key.(add))..., add...
 end
 
-@static if VERSION > v"0.6.2"
+if VERSION > v"0.6.2"
     keyed_tuple(n::NamedTuple) = map(
         let n = n
             key -> (Key(key), Base.getproperty(n, key))
@@ -227,16 +232,14 @@ Map f over the values of a keyed tuple.
 julia> using Keys
 
 julia> map_values(x -> x + 1, keyed_tuple(a = 1, b = 1.0))
-((.a, 2), (.b, 2.0))
+(a = 2, b = 2.0)
 ```
 """
 map_values(f, k::KeyedTuple) = map(
     let f = f
-        keyed -> (key(keyed), f(value(keyed)))
+        keyed -> Keyed(key(keyed), f(value(keyed)))
     end,
     k
 )
-
-unkey(::Key{T} where T) = T
 
 end
