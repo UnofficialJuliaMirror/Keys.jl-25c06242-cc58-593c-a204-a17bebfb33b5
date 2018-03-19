@@ -2,7 +2,9 @@ module Keys
 
 import RecurUnroll: getindex_unrolled, reduce_unrolled
 import TypedBools: True, False, not
-import Base: getindex, haskey, @pure
+import Base: getindex, haskey, merge
+import MacroTools: @match
+import Base.Meta: quot
 
 struct Key{K} end
 
@@ -91,12 +93,9 @@ const KeyedTuple = Union{
     NTuple{16, Keyed}
 }
 
-Keyed(t::Tuple{A, B}) where {A <: Symbol, B} = Keyed{t[1], B}(t[2])
-keyed_tuple(v::AbstractVector) = (map(Keyed, v)...,)
-
-export keyed_tuple
+export @keyed_tuple
 """
-    keyed_tuple(; args...)
+    @keyed_tuple(args...)
 
 Construct a [`KeyedTuple`](@ref). You can index them with symbols as
 if they were a Dict. On 0.7, you can also access values with `.`. Duplicated
@@ -105,8 +104,8 @@ keys are allowed; will return the first match.
 ```jldoctest
 julia> using Keys
 
-julia> k = keyed_tuple(a = 1, b = 1.0)
-((.a, 1), (.b, 1.0))
+julia> k = @keyed_tuple(a = 1, b = 1.0)
+(a = 1, b = 1.0)
 
 julia> if VERSION > v"0.6.2"
             k.b
@@ -124,9 +123,19 @@ ERROR: Key .c not found
 
 julia> haskey(k, :b)
 TypedBools.True()
+
+julia> merge(@keyed_tuple(a = 1, b = 1.0), @keyed_tuple(b = "a", c = 1 // 1))
+(a = 1, b = "a", c = 1//1)
 ```
 """
-keyed_tuple(; args...) = keyed_tuple(args)
+macro keyed_tuple(args...)
+    esc(:($(map(args) do arg
+        @match arg begin
+            (akey_ = avalue_) => :($Keyed{$(quot(akey))}($avalue))
+            any_ => error("Must be an assignment")
+        end
+    end...),))
+end
 
 match_key(::Keyed{K}, ::Key{K}) where K = True()
 match_key(::Keyed, ::Key) = False()
@@ -175,10 +184,10 @@ Delete all values matching key
 ```jldoctest
 julia> using Keys
 
-julia> delete(keyed_tuple(a = 1, b = 2.0), :b)
+julia> delete(@keyed_tuple(a = 1, b = 2.0), :b)
 (a = 1,)
 
-julia> delete(keyed_tuple(a = 1, b = 2.0), (:a, :b))
+julia> delete(@keyed_tuple(a = 1, b = 2.0), (:a, :b))
 ()
 ```
 """
@@ -190,35 +199,11 @@ delete(a_keyed_tuple::KeyedTuple, keys::KeyOrKeys) =
 @inline delete(a_keyed_tuple::KeyedTuple, ss::SymbolOrSymbols) =
     delete(a_keyed_tuple, to_keys(ss))
 
-export push
-"""
-    push(k::KeyedTuple; args...)
-
-Add keys to a [`KeyedTuple`](@ref). Will overwrite keys.
-
-```jldoctest
-julia> using Keys
-
-julia> push(keyed_tuple(a = 1, b = 1.0), b = "a", c = 1 // 1)
-(a = 1, b = "a", c = 1//1)
-```
-"""
-function push(k::KeyedTuple; args...)
-    add = keyed_tuple(args)
-    delete(k, key.(add))..., add...
+function merge(k1::KeyedTuple, k2::KeyedTuple)
+    delete(k1, key.(k2))..., k2...
 end
 
 if VERSION > v"0.6.2"
-    keyed_tuple(n::NamedTuple) = map(
-        let n = n
-            key -> (Key(key), Base.getproperty(n, key))
-        end,
-        keys(n)
-    )
-
-    keyed_tuple(b::Base.Iterators.Pairs) =
-        keyed_tuple(b.data)
-
     @inline Base.getproperty(key::KeyedTuple, s::Symbol) = getindex(key, Key(s))
 end
 
