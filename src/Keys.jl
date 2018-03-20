@@ -155,13 +155,17 @@ TypedBools.True()
 
 julia> merge(@keyed_tuple(a = 1, b = 1.0), @keyed_tuple(b = "a", c = 1 // 1))
 (a = 1, b = "a", c = 1//1)
+
+julia> @keyed_tuple(1)
+ERROR: All arguments to keyed_tuple must be an assignments
+[...]
 ```
 """
 macro keyed_tuple(args...)
     esc(:($(map(args) do arg
         @match arg begin
             (akey_ = avalue_) => :($Keyed{$(quot(akey))}($avalue))
-            any_ => error("Must be an assignment")
+            any_ => error("All arguments to keyed_tuple must be an assignments")
         end
     end...),))
 end
@@ -169,12 +173,14 @@ end
 match_key(::Keyed{K}, ::Key{K}) where K = True()
 match_key(::Keyed, ::Key) = False()
 
-match_key(keyed::Keyed, keys::SomeKeys) = reduce_unrolled(|, map(
-    let keyed = keyed
-        key -> match_key(keyed, key)
-    end,
-    keys
-))
+function match_key(keyed::Keyed, keys::SomeKeys)
+    reduce_unrolled(|, map(
+        let keyed = keyed
+            key -> match_key(keyed, key)
+        end,
+        keys
+    ))
+end
 
 first_error(::Tuple{}, key::Key) = error("Key $key not found")
 first_error(a_keyed_tuple::KeyedTuple, key::Key) = value(first(a_keyed_tuple))
