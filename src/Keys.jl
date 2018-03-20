@@ -245,7 +245,7 @@ Map f over the values of a keyed tuple.
 ```jldoctest
 julia> using Keys
 
-julia> map_values(x -> x + 1, keyed_tuple(a = 1, b = 1.0))
+julia> map_values(x -> x + 1, @keyed_tuple(a = 1, b = 1.0))
 (a = 2, b = 2.0)
 ```
 """
