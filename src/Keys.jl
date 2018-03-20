@@ -136,7 +136,7 @@ julia> using Keys
 julia> k = @keyed_tuple(a = 1, b = 1.0)
 (a = 1, b = 1.0)
 
-julia> if VERSION > v"0.6.2"
+julia> if VERSION >= v"0.7.0-DEV"
             k.b
         else
             k[:b]
@@ -238,7 +238,7 @@ function merge(k1::KeyedTuple, k2::KeyedTuple)
     delete(k1, key.(k2))..., k2...
 end
 
-if VERSION > v"0.6.2"
+if VERSION >= v"0.7.0-DEV"
     @inline Base.getproperty(key::KeyedTuple, s::Symbol) = getindex(key, Key(s))
 end
 
