@@ -10,8 +10,6 @@ matrix:
     - julia: nightly
 notifications:
   email: false
-script:
-  - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-  - julia -e ' Pkg.add("Documenter"); Pkg.clone(pwd()); Pkg.build("Keys"); Pkg.test("Keys"; coverage=true)'
 after_success:
-  - julia -e 'include(joinpath("docs", "make.jl")); cd(Pkg.dir("Keys")); Pkg.add("Coverage"); import Coverage; Coverage.Codecov.submit(process_folder())'
+  - julia -e 'Pkg.add("Documenter"); cd(Pkg.dir("KeyedTables")); include(joinpath("docs", "make.jl"))'
+  - julia -e 'Pkg.add("Coverage"); cd(Pkg.dir("KeyedTables")); using Coverage; Codecov.submit(process_folder())'
