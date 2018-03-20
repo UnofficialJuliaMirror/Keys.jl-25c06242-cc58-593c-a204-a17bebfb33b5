@@ -12,6 +12,6 @@ notifications:
   email: false
 script:
   - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-  - julia -e ' Pkg.add("Documenter"); Pkg.clone(pwd()); Pkg.build("Chunks"); Pkg.test("Chunks"; coverage=true)'
+  - julia -e ' Pkg.add("Documenter"); Pkg.clone(pwd()); Pkg.build("Keys"); Pkg.test("Keys"; coverage=true)'
 after_success:
-  - julia -e 'include(joinpath("docs", "make.jl")); cd(Pkg.dir("Chunks")); Pkg.add("Coverage"); import Coverage; Coverage.Codecov.submit(process_folder())'
+  - julia -e 'include(joinpath("docs", "make.jl")); cd(Pkg.dir("Keys")); Pkg.add("Coverage"); import Coverage; Coverage.Codecov.submit(process_folder())'
