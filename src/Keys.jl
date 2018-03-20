@@ -6,6 +6,19 @@ import Base: getindex, haskey, merge
 import MacroTools: @match
 import Base.Meta: quot
 
+export Key
+"""
+    struct Key{K}
+
+A typed key.
+
+```jldoctest
+julia> using Keys
+
+julia> Key(:a)
+.a
+```
+"""
 struct Key{K} end
 
 const Some{T} = NTuple{N, T} where N
@@ -25,6 +38,22 @@ function Base.show(io::IO, key::Key{K}) where K
     print(io, K)
 end
 
+export Keyed
+"""
+    struct Keyed{K, V}
+
+A keyed value.
+
+```jldoctest
+julia> using Keys
+
+julia> Keyed{:a}(1)
+a = 1
+
+julia> Keyed(Key(:a), 1)
+a = 1
+```
+"""
 struct Keyed{K, V}
     value::V
 end
@@ -41,7 +70,7 @@ Get the key of a [`Keyed`](@ref) value.
 ```jldoctest
 julia> using Keys
 
-julia> map(key, keyed_tuple(a = 1, b = 2.0))
+julia> map(key, @keyed_tuple(a = 1, b = 2.0))
 (.a, .b)
 ```
 """
@@ -56,7 +85,7 @@ Get the value of a [`Keyed`](@ref) value.
 ```jldoctest
 julia> using Keys
 
-julia> map(value, keyed_tuple(a = 1, b = 1.0))
+julia> map(value, @keyed_tuple(a = 1, b = 1.0))
 (1, 1.0)
 ```
 """
