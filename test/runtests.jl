@@ -13,18 +13,5 @@ Documenter.makedocs(
     authors = "Brandon Taylor"
 )
 
-import Base.Test: @inferred
-if VERSION > v"0.6.2"
-    test1() = keyed_tuple(a = 1, b = 1.0)
-    k = @inferred test1()
-    test2(k) = k[:a]
-    @inferred test2(k)
-    test3(k) = getindex(k, (:a, :b))
-    @inferred test3(k)
-    test4(k) = haskey(k, :b)
-    @inferred test4(k)
-    test5(k) = Base.setindex(k, 1//1, :b)
-    @inferred test5(k)
-    test6(k) = delete(k, :b)
-    @inferred test6(k)
-end
+import Base.Test: @test
+@test @keys Ref(1).x == 1
