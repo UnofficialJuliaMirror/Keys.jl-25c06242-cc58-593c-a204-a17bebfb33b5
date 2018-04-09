@@ -15,8 +15,6 @@ A typed key
 """
 struct Key{K} end
 
-@inline Key(s::Symbol) = Key{s}()
-
 const SomeKeys = NTuple{N, Key} where N
 
 function Base.show(io::IO, key::Key{K}) where K
@@ -256,13 +254,14 @@ rename_single(replacement, a_keyed_tuple) =
 
 rename(a_keyed_tuple::KeyedTuple) = a_keyed_tuple
 
+export rename
 """
     rename(a_keyed_tuple::KeyedTuple, replacements...)
 
 Replacements should be pairs of keys; where the first key matches in
 `a_keyed_tuple`, it will be replaced by the second.
 
-```
+```jldoctest
 julia> using Keys
 
 julia> @keys rename((:a => 1, :b => "a"), :c => :a)
