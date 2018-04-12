@@ -278,7 +278,7 @@ export gather
 
 Gather values from a keyed tuple into key and value columns.
 
-```julia
+```jldoctest
 julia> using Keys
 
 julia> keyed_tuple = @keys (:a => "a", :b => 2, :c => 3)
