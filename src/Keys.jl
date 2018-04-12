@@ -16,6 +16,7 @@ A typed key
 struct Key{K} end
 
 const SomeKeys = NTuple{N, Key} where N
+const PairOfKeys = Pair{T1, T2} where {T1 <: Key, T2 <: Key}
 
 function Base.show(io::IO, key::Key{K}) where K
     print(io, :.)
@@ -100,7 +101,7 @@ julia> @keys value.((:a => 1, :b => 1.0))
 (1, 1.0)
 ```
 """
-value(a_keyed_tuple::Keyed) = a_keyed_tuple.second
+value(keyed_tuple::Keyed) = keyed_tuple.second
 
 export KeyedTuple
 """
@@ -121,24 +122,24 @@ keys are allowed; will return the first match.
 ```jldoctest
 julia> using Keys
 
-julia> @keys a_keyed_tuple = (:a => 1, :b => 1.0)
+julia> @keys keyed_tuple = (:a => 1, :b => 1.0)
 (.a=>1, .b=>1.0)
 
 julia> if VERSION >= v"0.7.0-DEV"
-            a_keyed_tuple.b
+            keyed_tuple.b
         else
-            @keys a_keyed_tuple[:b]
+            @keys keyed_tuple[:b]
         end
 1.0
 
-julia> @keys a_keyed_tuple[(:a, :b)]
+julia> @keys keyed_tuple[(:a, :b)]
 (.a=>1, .b=>1.0)
 
-julia> @keys a_keyed_tuple[:c]
+julia> @keys keyed_tuple[:c]
 ERROR: Key .c not found
 [...]
 
-julia> @keys haskey(a_keyed_tuple, :b)
+julia> @keys haskey(keyed_tuple, :b)
 TypedBools.True()
 ```
 """
@@ -165,30 +166,30 @@ function match_key(keyed::Keyed, keys::SomeKeys)
 end
 
 first_error(::Tuple{}, key::Key) = error("Key $key not found")
-first_error(a_keyed_tuple::KeyedTuple, key::Key) = value(first(a_keyed_tuple))
+first_error(keyed_tuple::KeyedTuple, key::Key) = value(first(keyed_tuple))
 
-which_key(a_keyed_tuple::KeyedTuple, key::Union{Key, SomeKeys}) = map(
+which_key(keyed_tuple::KeyedTuple, key::Union{Key, SomeKeys}) = map(
     let key = key
         keyed -> match_key(keyed, key)
     end,
-    a_keyed_tuple
+    keyed_tuple
 )
 
-_getindex(a_keyed_tuple, keys) =
-    getindex_unrolled(a_keyed_tuple, which_key(a_keyed_tuple, keys))
+_getindex(keyed_tuple, keys) =
+    getindex_unrolled(keyed_tuple, which_key(keyed_tuple, keys))
 
-getindex(a_keyed_tuple::KeyedTuple, key::Key) =
-    first_error(_getindex(a_keyed_tuple, key), key)
+getindex(keyed_tuple::KeyedTuple, key::Key) =
+    first_error(_getindex(keyed_tuple, key), key)
 
-getindex(a_keyed_tuple::KeyedTuple, keys::SomeKeys) =
-    _getindex(a_keyed_tuple, keys)
+getindex(keyed_tuple::KeyedTuple, keys::SomeKeys) =
+    _getindex(keyed_tuple, keys)
 
-haskey(a_keyed_tuple::KeyedTuple, key::Key) =
-    reduce_unrolled(|, which_key(a_keyed_tuple, key))
+haskey(keyed_tuple::KeyedTuple, key::Key) =
+    reduce_unrolled(|, which_key(keyed_tuple, key))
 
 export delete
 """
-    delete(a_keyed_tuple::KeyedTuple, keys::Key...)
+    delete(keyed_tuple::KeyedTuple, keys::Key...)
 
 Delete all keyed values matching keys.
 
@@ -199,10 +200,10 @@ julia> @keys delete((:a => 1, :b => 1.0), :a)
 (.b=>1.0,)
 ```
 """
-delete(a_keyed_tuple::KeyedTuple, keys::Key...) =
-    getindex_unrolled(a_keyed_tuple, map(
+delete(keyed_tuple::KeyedTuple, keys::Key...) =
+    getindex_unrolled(keyed_tuple, map(
         not,
-        which_key(a_keyed_tuple, keys)))
+        which_key(keyed_tuple, keys)))
 
 export push
 """
@@ -236,30 +237,30 @@ julia> @keys map_values(x -> x + 1, (:a => 1, :b => 1.0))
 (.a=>2, .b=>2.0)
 ```
 """
-map_values(f, a_keyed_tuple::KeyedTuple) = map(
+map_values(f, keyed_tuple::KeyedTuple) = map(
     let f = f
         keyed -> key(keyed) => f(value(keyed))
     end,
-    a_keyed_tuple
+    keyed_tuple
 )
 
-rename_one(replacement::Keyed{K2, Key{K1}}, old_keyed::Keyed{K1}) where {K1, K2} =
+rename_one(replacement::Keyed{New, Key{Old}}, old_keyed::Keyed{Old}) where {Old, New} =
     replacement.first => old_keyed.second
-rename_one(replacement::Keyed, old_keyed::Keyed) = old_keyed
+rename_one(replacement::PairOfKeys, old_keyed::Keyed) = old_keyed
 
-rename_single(replacement, ::Tuple{}) = ()
-rename_single(replacement, a_keyed_tuple) =
-    rename_one(replacement, first(a_keyed_tuple)),
-    rename_single(replacement, tail(a_keyed_tuple))...
+rename_single(replacement::PairOfKeys, ::Tuple{}) = ()
+rename_single(replacement::PairOfKeys, keyed_tuple::KeyedTuple) =
+    rename_one(replacement, first(keyed_tuple)),
+    rename_single(replacement, tail(keyed_tuple))...
 
-rename(a_keyed_tuple::KeyedTuple) = a_keyed_tuple
+rename(keyed_tuple::KeyedTuple) = keyed_tuple
 
 export rename
 """
-    rename(a_keyed_tuple::KeyedTuple, replacements...)
+    rename(keyed_tuple::KeyedTuple, replacements::PairOfKeys...)
 
 Replacements should be pairs of keys; where the first key matches in
-`a_keyed_tuple`, it will be replaced by the second.
+`keyed_tuple`, it will be replaced by the second.
 
 ```jldoctest
 julia> using Keys
@@ -268,7 +269,30 @@ julia> @keys rename((:a => 1, :b => "a"), :c => :a)
 (.c=>1, .b=>"a")
 ```
 """
-rename(a_keyed_tuple::KeyedTuple, replacements...) =
-    rename(rename_single(first(replacements), a_keyed_tuple), tail(replacements)...)
+rename(keyed_tuple::KeyedTuple, replacements::PairOfKeys...) =
+    rename(rename_single(first(replacements), keyed_tuple), tail(replacements)...)
+
+export gather
+"""
+    gather(keyed_tuple::KeyedTuple, key_name::Key, value_name::Key, keys::Key...)
+
+Gather values from a keyed tuple into key and value columns.
+
+```julia
+julia> using Keys
+
+julia> keyed_tuple = @keys (:a => "a", :b => 2, :c => 3)
+
+julia> @keys gather(keyed_tuple, :key, :value, :b, :c)
+((.a=>1, .key=>:b, .value=>2), (.a=>1, .key=>:c, .value=>3))
+```
+"""
+gather(keyed_tuple::KeyedTuple, key_name::Key, value_name::Key, keys::Key...) =
+    map(
+        let withouts = delete(a_named_tuple, keys...), key_name = key_name, keyed_tuple = keyed_tuple
+            key -> push(withouts, key_name => inner_value(key), value_name => a_named_tuple[key])
+        end,
+        keys
+    )
 
 end
