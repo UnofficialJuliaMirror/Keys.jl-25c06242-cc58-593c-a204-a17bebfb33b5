@@ -289,8 +289,8 @@ julia> @keys gather(keyed_tuple, :key, :value, :b, :c)
 """
 gather(keyed_tuple::KeyedTuple, key_name::Key, value_name::Key, keys::Key...) =
     map(
-        let withouts = delete(a_named_tuple, keys...), key_name = key_name, keyed_tuple = keyed_tuple
-            key -> push(withouts, key_name => inner_value(key), value_name => a_named_tuple[key])
+        let withouts = delete(keyed_tuple, keys...), key_name = key_name, keyed_tuple = keyed_tuple
+            key -> push(withouts, key_name => inner_value(key), value_name => keyed_tuple[key])
         end,
         keys
     )
