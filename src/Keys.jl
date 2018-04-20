@@ -1,7 +1,7 @@
 module Keys
 
-import RecurUnroll: getindex_unrolled, reduce_unrolled
-import TypedBools: True, False, not
+import RecurUnroll: getindex_unrolled, reduce_unrolled, filter_unrolled, product_unrolled
+import TypedBools: True, False, not, same_type
 import Base: getindex, haskey, merge, tail
 import MacroTools: @match
 import Base.Meta: quot
@@ -14,6 +14,8 @@ A typed key
 ```
 """
 struct Key{K} end
+
+inner_value(k::Key{K}) where K = K
 
 const SomeKeys = NTuple{N, Key} where N
 const PairOfKeys = Pair{T1, T2} where {T1 <: Key, T2 <: Key}
@@ -281,10 +283,10 @@ Gather values from a keyed tuple into key and value columns.
 ```jldoctest
 julia> using Keys
 
-julia> keyed_tuple = @keys (:a => "a", :b => 2, :c => 3)
+julia> keyed_tuple = @keys (:a => "a", :b => 2, :c => 3);
 
 julia> @keys gather(keyed_tuple, :key, :value, :b, :c)
-((.a=>1, .key=>:b, .value=>2), (.a=>1, .key=>:c, .value=>3))
+((.a=>"a", .key=>:b, .value=>2), (.a=>"a", .key=>:c, .value=>3))
 ```
 """
 gather(keyed_tuple::KeyedTuple, key_name::Key, value_name::Key, keys::Key...) =
@@ -294,5 +296,19 @@ gather(keyed_tuple::KeyedTuple, key_name::Key, value_name::Key, keys::Key...) =
         end,
         keys
     )
+
+common_keys(x::KeyedTuple, y::KeyedTuple) =
+    first.(filter_unrolled(pair -> same_type(pair[1], pair[2]), product_unrolled(key.(x), key.(y))))
+
+"""
+```jldoctest
+julia> using Keys
+
+julia> @keys merge((:a => 1, :b => 2.0), (:a => 2, :c => 3.0))
+(.b=>2.0, .a=>2, .c=>3.0)
+```
+"""
+merge(a::KeyedTuple, b::KeyedTuple) =
+    (delete(a, common_keys(a, b)...)..., b...)
 
 end
