@@ -45,6 +45,7 @@ end
 replace_keys(anything) = anything
 replace_keys(q::QuoteNode) = replace_keys(quot(q.value))
 replace_keys(e::Expr) = @match e begin
+    ^(a_) => a
     a_.b_ => :($(replace_keys(a)).$b)
     :(a_) => :($Key{$(quot(a))}())
     e_ => Expr(e.head, map(replace_keys, e.args)...)
