@@ -5,6 +5,7 @@ import TypedBools: True, False, not, same_type
 import Base: getindex, haskey, merge, tail
 import MacroTools: @match
 import Base.Meta: quot
+import Requires: @require
 
 export Key
 """
@@ -17,54 +18,29 @@ struct Key{K} end
 
 inner_value(k::Key{K}) where K = K
 
-const SomeKeys = NTuple{N, Key} where N
-const PairOfKeys = Pair{T1, T2} where {T1 <: Key, T2 <: Key}
-
-function Base.show(io::IO, key::Key{K}) where K
-    print(io, :.)
-    print(io, K)
-end
-
-export @k_str
+export @__str
 """
-    k_str(s::String)
+    @__str
 
 Make a key
 
 ```jldoctest
 julia> using Keys
 
-julia> k"a"
+julia> _"a"
 .a
 ```
 """
-macro k_str(s::String)
+macro __str(s::String)
     esc(:($Key{$(quot(Symbol(s)))}()))
 end
 
-replace_keys(anything) = anything
-replace_keys(q::QuoteNode) = replace_keys(quot(q.value))
-replace_keys(e::Expr) = @match e begin
-    a_.b_ => :($(replace_keys(a)).$b)
-    :(a_) => :($Key{$(quot(a))}())
-    e_ => Expr(e.head, map(replace_keys, e.args)...)
-end
+const SomeKeys = NTuple{N, Key} where N
+const PairOfKeys = Pair{T1, T2} where {T1 <: Key, T2 <: Key}
 
-export @keys
-"""
-    macro keys(e)
-
-Make any symbol in e a key.
-
-```jldoctest
-julia> using Keys
-
-julia> @keys (:a => 1, :b => 2)
-(.a=>1, .b=>2)
-```
-"""
-macro keys(e)
-    esc(replace_keys(e))
+function Base.show(io::IO, key::Key{K}) where K
+    print(io, :.)
+    print(io, K)
 end
 
 export Keyed
@@ -84,7 +60,7 @@ Get the key of a [`Keyed`](@ref) value.
 ```jldoctest
 julia> using Keys
 
-julia> @keys key.((:a => 1, :b => 2.0))
+julia> key.((_"a" => 1, _"b" => 2))
 (.a, .b)
 ```
 """
@@ -99,8 +75,8 @@ Get the value of a [`Keyed`](@ref) value.
 ```jldoctest
 julia> using Keys
 
-julia> @keys value.((:a => 1, :b => 1.0))
-(1, 1.0)
+julia> value.((_"a" => 1, _"b" => 2))
+(1, 2)
 ```
 """
 value(keyed_tuple::Keyed) = keyed_tuple.second
@@ -109,51 +85,56 @@ export KeyedTuple
 """
     const KeyedTuple
 
-A tuple with only [`Keyed`](@ref) values.
-"""
-const KeyedTuple = Tuple{Keyed, Vararg{Keyed}}
-
-export @keyed
-"""
-    @keyed(args...)
-
-Construct a [`KeyedTuple`](@ref). You can index them with symbols as
-if they were a Dict. On 0.7, you can also access values with `.`. Duplicated
-keys are allowed; will return the first match.
+A tuple with only [`Keyed`](@ref) values. You can index them with keys; on 0.7, y
+ou can also access values with `.`. Duplicated keys are allowed; will return the
+first match.
 
 ```jldoctest
 julia> using Keys
 
-julia> @keys keyed_tuple = (:a => 1, :b => 1.0)
-(.a=>1, .b=>1.0)
+julia> keyed_tuple = (_"a" => 1, _"b" => 2)
+(.a=>1, .b=>2)
 
 julia> if VERSION >= v"0.7.0-DEV"
             keyed_tuple.b
         else
-            @keys keyed_tuple[:b]
+            keyed_tuple[_"b"]
         end
-1.0
+2
 
-julia> @keys keyed_tuple[(:a, :b)]
-(.a=>1, .b=>1.0)
+julia> keyed_tuple[(_"a", _"b")]
+(.a=>1, .b=>2)
 
-julia> @keys keyed_tuple[:c]
+julia> keyed_tuple[_"c"]
 ERROR: Key .c not found
 [...]
 
-julia> @keys haskey(keyed_tuple, :b)
+julia> haskey(keyed_tuple, _"b")
 TypedBools.True()
+
+julia> merge(keyed_tuple, (_"a" => 4, _"c" => 3))
+(.b=>2, .a=>4, .c=>3)
+```
+
+Conversions defined for DataFrames:
+
+```jldoctest
+julia> using Keys, DataFrames
+
+julia> d = DataFrame(x = [1, 2], y = ["a", "b"]);
+
+julia> k = KeyedTuple(d)
+(.x=>[1, 2], .y=>String["a", "b"])
+
+julia> DataFrame(k)
+2×2 DataFrames.DataFrame
+│ Row │ x │ y │
+├─────┼───┼───┤
+│ 1   │ 1 │ a │
+│ 2   │ 2 │ b │
 ```
 """
-macro keyed(e::Expr)
-    map!(e.args) do arg
-        @match arg begin
-            (akey_ = avalue_) => :($Keyed{$(quot(akey))}($avalue))
-            any_ => any
-        end
-    end
-    esc(e)
-end
+const KeyedTuple = Tuple{Keyed, Vararg{Keyed}}
 
 match_key(::Keyed{K}, ::Key{K}) where K = True()
 match_key(::Keyed, ::Key) = False()
@@ -198,8 +179,8 @@ Delete all keyed values matching keys.
 ```jldoctest
 julia> using Keys
 
-julia> @keys delete((:a => 1, :b => 1.0), :a)
-(.b=>1.0,)
+julia> delete((_"a" => 1, _"b" => 2), _"a")
+(.b=>2,)
 ```
 """
 delete(keyed_tuple::KeyedTuple, keys::Key...) =
@@ -216,8 +197,8 @@ Push the pairs in args into `k1`, replacing common keys.
 ```jldoctest
 julia> using Keys
 
-julia> @keys push((:a => 1, :b => 1.0), :b => "a", :c => 1 // 1)
-(.a=>1, .b=>"a", .c=>1//1)
+julia> push((_"a" => 1, _"b" => 2), _"b" => 4, _"c" => 3)
+(.a=>1, .b=>4, .c=>3)
 ```
 """
 push(k1::KeyedTuple, k2::Keyed...) = delete(k1, key.(k2)...)..., k2...
@@ -235,8 +216,8 @@ Map f over the values of a keyed tuple.
 ```jldoctest
 julia> using Keys
 
-julia> @keys map_values(x -> x + 1, (:a => 1, :b => 1.0))
-(.a=>2, .b=>2.0)
+julia> map_values(x -> x + 1, (_"a" => 1, _"b" => 2))
+(.a=>2, .b=>3)
 ```
 """
 map_values(f, keyed_tuple::KeyedTuple) = map(
@@ -267,48 +248,32 @@ Replacements should be pairs of keys; where the first key matches in
 ```jldoctest
 julia> using Keys
 
-julia> @keys rename((:a => 1, :b => "a"), :c => :a)
-(.c=>1, .b=>"a")
+julia> rename((_"a" => 1, _"b" => 2), _"c" => _"a")
+(.c=>1, .b=>2)
 ```
 """
 rename(keyed_tuple::KeyedTuple, replacements::PairOfKeys...) =
     rename(rename_single(first(replacements), keyed_tuple), tail(replacements)...)
 
-export gather
-"""
-    gather(keyed_tuple::KeyedTuple, key_name::Key, value_name::Key, keys::Key...)
-
-Gather values from a keyed tuple into key and value columns.
-
-```jldoctest
-julia> using Keys
-
-julia> keyed_tuple = @keys (:a => "a", :b => 2, :c => 3);
-
-julia> @keys gather(keyed_tuple, :key, :value, :b, :c)
-((.a=>"a", .key=>:b, .value=>2), (.a=>"a", .key=>:c, .value=>3))
-```
-"""
-gather(keyed_tuple::KeyedTuple, key_name::Key, value_name::Key, keys::Key...) =
-    map(
-        let withouts = delete(keyed_tuple, keys...), key_name = key_name, keyed_tuple = keyed_tuple
-            key -> push(withouts, key_name => inner_value(key), value_name => keyed_tuple[key])
-        end,
-        keys
-    )
-
 common_keys(x::KeyedTuple, y::KeyedTuple) =
     first.(filter_unrolled(pair -> same_type(pair[1], pair[2]), product_unrolled(key.(x), key.(y))))
 
-"""
-```jldoctest
-julia> using Keys
-
-julia> @keys merge((:a => 1, :b => 2.0), (:a => 2, :c => 3.0))
-(.b=>2.0, .a=>2, .c=>3.0)
-```
-"""
 merge(a::KeyedTuple, b::KeyedTuple) =
     (delete(a, common_keys(a, b)...)..., b...)
+
+@require DataFrames begin
+
+    import DataFrames: DataFrame
+
+    (::Type{KeyedTuple})(d::DataFrame) = (map(
+        (name, column) -> Key{name}() => (column),
+        names(d),
+        d.columns
+    )...)
+
+    DataFrame(k::KeyedTuple) =
+        DataFrame(map(x -> inner_value(x.first) => x.second, k)...)
+
+end
 
 end

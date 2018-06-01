@@ -12,6 +12,3 @@ Documenter.makedocs(
     checkdocs = :exports,
     authors = "Brandon Taylor"
 )
-
-import Base.Test: @test
-@test @keys Ref(1).x == 1
