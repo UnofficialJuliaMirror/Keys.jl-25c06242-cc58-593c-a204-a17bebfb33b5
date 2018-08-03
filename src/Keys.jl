@@ -1,11 +1,11 @@
 module Keys
 
-import RecurUnroll: getindex_unrolled, reduce_unrolled, filter_unrolled, product_unrolled
-import TypedBools: True, False, not, same_type
-import Base: getindex, haskey, merge, tail
-import MacroTools: @match
+import Base: getindex, haskey, merge, tail, convert, &, |
 import Base.Meta: quot
 import Requires: @require
+
+include("typed_bools.jl")
+include("recur_unroll.jl")
 
 export Key
 """
@@ -93,45 +93,23 @@ first match.
 julia> using Keys
 
 julia> keyed_tuple = (_"a" => 1, _"b" => 2)
-(.a=>1, .b=>2)
+(.a => 1, .b => 2)
 
-julia> if VERSION >= v"0.7.0-DEV"
-            keyed_tuple.b
-        else
-            keyed_tuple[_"b"]
-        end
+julia> keyed_tuple.b
 2
 
 julia> keyed_tuple[(_"a", _"b")]
-(.a=>1, .b=>2)
+(.a => 1, .b => 2)
 
-julia> keyed_tuple[_"c"]
+julia> keyed_tuple.c
 ERROR: Key .c not found
 [...]
 
 julia> haskey(keyed_tuple, _"b")
-TypedBools.True()
+True()
 
 julia> merge(keyed_tuple, (_"a" => 4, _"c" => 3))
-(.b=>2, .a=>4, .c=>3)
-```
-
-Conversions defined for DataFrames:
-
-```jldoctest
-julia> using Keys, DataFrames
-
-julia> d = DataFrame(x = [1, 2], y = ["a", "b"]);
-
-julia> k = KeyedTuple(d)
-(.x=>[1, 2], .y=>String["a", "b"])
-
-julia> DataFrame(k)
-2×2 DataFrames.DataFrame
-│ Row │ x │ y │
-├─────┼───┼───┤
-│ 1   │ 1 │ a │
-│ 2   │ 2 │ b │
+(.b => 2, .a => 4, .c => 3)
 ```
 """
 const KeyedTuple = Tuple{Keyed, Vararg{Keyed}}
@@ -180,7 +158,7 @@ Delete all keyed values matching keys.
 julia> using Keys
 
 julia> delete((_"a" => 1, _"b" => 2), _"a")
-(.b=>2,)
+(.b => 2,)
 ```
 """
 delete(keyed_tuple::KeyedTuple, keys::Key...) =
@@ -198,14 +176,12 @@ Push the pairs in args into `k1`, replacing common keys.
 julia> using Keys
 
 julia> push((_"a" => 1, _"b" => 2), _"b" => 4, _"c" => 3)
-(.a=>1, .b=>4, .c=>3)
+(.a => 1, .b => 4, .c => 3)
 ```
 """
 push(k1::KeyedTuple, k2::Keyed...) = delete(k1, key.(k2)...)..., k2...
 
-if VERSION >= v"0.7.0-DEV"
-    @inline Base.getproperty(key::KeyedTuple, s::Symbol) = getindex(key, Key(s))
-end
+@inline Base.getproperty(key::KeyedTuple, s::Symbol) = getindex(key, Key{s}())
 
 export map_values
 """
@@ -217,7 +193,7 @@ Map f over the values of a keyed tuple.
 julia> using Keys
 
 julia> map_values(x -> x + 1, (_"a" => 1, _"b" => 2))
-(.a=>2, .b=>3)
+(.a => 2, .b => 3)
 ```
 """
 map_values(f, keyed_tuple::KeyedTuple) = map(
@@ -249,7 +225,7 @@ Replacements should be pairs of keys; where the first key matches in
 julia> using Keys
 
 julia> rename((_"a" => 1, _"b" => 2), _"c" => _"a")
-(.c=>1, .b=>2)
+(.c => 1, .b => 2)
 ```
 """
 rename(keyed_tuple::KeyedTuple, replacements::PairOfKeys...) =
@@ -261,6 +237,7 @@ common_keys(x::KeyedTuple, y::KeyedTuple) =
 merge(a::KeyedTuple, b::KeyedTuple) =
     (delete(a, common_keys(a, b)...)..., b...)
 
+#=
 @require DataFrames begin
 
     import DataFrames: DataFrame
@@ -275,5 +252,6 @@ merge(a::KeyedTuple, b::KeyedTuple) =
         DataFrame(map(x -> inner_value(x.first) => x.second, k)...)
 
 end
+=#
 
 end
