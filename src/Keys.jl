@@ -11,7 +11,6 @@ export Key
     struct Key{K}
 
 A typed key
-```
 """
 struct Key{K} end
 

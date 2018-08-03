@@ -14,6 +14,12 @@ false
 julia> Bool(True())
 true
 
+julia> TypedBool(false)
+False()
+
+julia> TypedBool(true)
+True()
+
 julia> True() & True() & False()
 False()
 
@@ -32,31 +38,17 @@ abstract type TypedBool end
 struct True <: TypedBool end
 struct False <: TypedBool end
 
-export True
-export False
-
-export typed
-"""
-    typed(x)
-
-Convert a Bool to a TypedBool
-
-```jldoctest
-julia> using Keys
-
-julia> typed(false)
-False()
-
-julia> typed(true)
-True()
-```
-"""
-typed(x) =
-    if x
+@inline TypedBool(b::Bool) =
+    if b
         True()
     else
         False()
     end
+
+export True
+export False
+
+export typed
 
 Base.Bool(::True) = true
 Base.Bool(::False) = false
