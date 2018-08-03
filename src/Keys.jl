@@ -2,7 +2,6 @@ module Keys
 
 import Base: getindex, haskey, merge, tail, convert, &, |
 import Base.Meta: quot
-import Requires: @require
 
 include("typed_bools.jl")
 include("recur_unroll.jl")
