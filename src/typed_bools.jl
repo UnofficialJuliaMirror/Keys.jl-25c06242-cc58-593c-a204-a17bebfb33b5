@@ -1,3 +1,4 @@
+export TypedBool
 """
     abstract TypedBool
 
@@ -35,9 +36,6 @@ True()
 ```
 """
 abstract type TypedBool end
-struct True <: TypedBool end
-struct False <: TypedBool end
-
 @inline TypedBool(b::Bool) =
     if b
         True()
@@ -46,9 +44,9 @@ struct False <: TypedBool end
     end
 
 export True
+struct True <: TypedBool end
 export False
-
-export typed
+struct False <: TypedBool end
 
 Base.Bool(::True) = true
 Base.Bool(::False) = false
