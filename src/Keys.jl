@@ -1,6 +1,6 @@
 module Keys
 
-import Base: getindex, haskey, merge, tail, convert, &, |
+import Base: getindex, haskey, merge, convert, &, |, @pure, Bool, tail
 import Base.Meta: quot
 
 include("typed_bools.jl")
@@ -125,7 +125,7 @@ function match_key(keyed::Keyed, keys::SomeKeys)
 end
 
 first_error(::Tuple{}, key::Key) = error("Key $key not found")
-first_error(keyed_tuple::KeyedTuple, key::Key) = value(first(keyed_tuple))
+first_error(keyed_tuple::KeyedTuple, key::Key) = value(keyed_tuple[1])
 
 which_key(keyed_tuple::KeyedTuple, key::Union{Key, SomeKeys}) = map(
     let key = key
@@ -207,7 +207,7 @@ rename_one(replacement::PairOfKeys, old_keyed::Keyed) = old_keyed
 
 rename_single(replacement::PairOfKeys, ::Tuple{}) = ()
 rename_single(replacement::PairOfKeys, keyed_tuple::KeyedTuple) =
-    rename_one(replacement, first(keyed_tuple)),
+    rename_one(replacement, keyed_tuple[1]),
     rename_single(replacement, tail(keyed_tuple))...
 
 rename(keyed_tuple::KeyedTuple) = keyed_tuple
@@ -227,7 +227,7 @@ julia> rename((_"a" => 1, _"b" => 2), _"c" => _"a")
 ```
 """
 rename(keyed_tuple::KeyedTuple, replacements::PairOfKeys...) =
-    rename(rename_single(first(replacements), keyed_tuple), tail(replacements)...)
+    rename(rename_single(replacements[1], keyed_tuple), tail(replacements)...)
 
 common_keys(x::KeyedTuple, y::KeyedTuple) =
     first.(filter_unrolled(pair -> same_type(pair[1], pair[2]), product_unrolled(key.(x), key.(y))))

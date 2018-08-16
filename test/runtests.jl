@@ -16,19 +16,19 @@ Documenter.makedocs(
 using Test
 
 x = (1, 2, 3)
-empty = ()
+t0 = ()
 switch = (True(), True(), False())
 new = (4, 5)
 
-@test_throws ArgumentError reduce_unrolled(+, empty)
+@test_throws ArgumentError reduce_unrolled(+, t0)
 
-@test getindex_unrolled(x, empty) == empty
-@test getindex_unrolled(empty, switch) == empty
+@test getindex_unrolled(x, t0) == t0
+@test getindex_unrolled(t0, switch) == t0
 
-@test setindex_many_unrolled(empty, empty, switch) == empty
-@test setindex_many_unrolled(empty, new, empty) == empty
-@test setindex_many_unrolled(empty, new, switch) == empty
-@test setindex_many_unrolled(x, empty, empty) == empty
-@test setindex_many_unrolled(x, empty, switch) === (missing, missing, 3)
-@test setindex_many_unrolled(x, new, empty) == empty
-@test setindex_many_unrolled(empty, empty, empty) == empty
+@test setindex_unrolled(t0, t0, switch) == t0
+@test setindex_unrolled(t0, new, t0) == t0
+@test setindex_unrolled(t0, new, switch) == t0
+@test setindex_unrolled(x, t0, t0) == x
+@test setindex_unrolled(x, t0, switch) == x
+@test setindex_unrolled(x, new, t0) == t0
+@test setindex_unrolled(t0, t0, t0) == t0

@@ -1,54 +1,85 @@
-const T0 = Tuple{}
+const ShortTuple = Union{
+    Tuple{},
+    Tuple{A} where {A},
+    Tuple{A, B} where {A, B},
+    Tuple{A, B, C} where {A, B, C},
+    Tuple{A, B, C, D} where {A, B, C, D},
+    Tuple{A, B, C, D, E} where {A, B, C, D, E},
+    Tuple{A, B, C, D, E, F} where {A, B, C, D, E, F},
+    Tuple{A, B, C, D, E, F, G} where {A, B, C, D, E, F, G},
+    Tuple{A, B, C, D, E, F, G, H} where {A, B, C, D, E, F, G, H},
+    Tuple{A, B, C, D, E, F, G, H, I} where {A, B, C, D, E, F, G, H, I},
+    Tuple{A, B, C, D, E, F, G, H, I, J} where {A, B, C, D, E, F, G, H, I, J},
+    Tuple{A, B, C, D, E, F, G, H, I, J, K} where {A, B, C, D, E, F, G, H, I, J, K},
+    Tuple{A, B, C, D, E, F, G, H, I, J, K, L} where {A, B, C, D, E, F, G, H, I, J, K, L},
+    Tuple{A, B, C, D, E, F, G, H, I, J, K, L, M} where {A, B, C, D, E, F, G, H, I, J, K, L, M},
+    Tuple{A, B, C, D, E, F, G, H, I, J, K, L, M, N} where {A, B, C, D, E, F, G, H, I, J, K, L, M, N},
+    Tuple{A, B, C, D, E, F, G, H, I, J, K, L, M, N, O} where {A, B, C, D, E, F, G, H, I, J, K, L, M, N, O},
+    Tuple{A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P} where {A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P}
+}
 
-argtail(x, rest...) = rest
-tail(x) = argtail(x...)
+export fill_tuple
+"""
+```jldoctest
+julia> using Keys
 
-reduce_unrolled(reducer, ::T0) = Base._empty_reduce_error()
-reduce_unrolled(reducer, args) = reduce_unrolled(
+julia> fill_tuple((1, 'a', 1.0), "a")
+("a", "a", "a")
+```
+"""
+fill_tuple(t::ShortTuple, value) = ntuple(
+    let value = value
+        x -> value
+    end,
+    length(t)
+)
+
+reduce_unrolled(reducer, ::Tuple{}) = Base._empty_reduce_error()
+reduce_unrolled(reducer, args::ShortTuple) = reduce_unrolled(
     reducer,
-    first(args),
+    args[1],
     tail(args)
 )
-reduce_unrolled(reducer, default, args::T0) = default
+reduce_unrolled(reducer, default, args::Tuple{}) = default
 
 export reduce_unrolled
 """
 ```jldoctest
 julia> using Keys
 
-julia> reduce_unrolled(&, (True(), False(), True()))
-False()
+julia> reduce_unrolled(&, (true, false, true))
+false
 ```
 """
-reduce_unrolled(reducer, default, args) =
-    reducer(default, reduce_unrolled(reducer, first(args), tail(args)))
+reduce_unrolled(reducer, default, args::ShortTuple) =
+    reducer(default, reduce_unrolled(reducer, args[1], tail(args)))
 
 export getindex_unrolled
-
-const T0 = Tuple{}
-
-export getindex_unrolled
-getindex_unrolled(into::T0, switch::T0) = ()
-getindex_unrolled(into, switch::T0) = ()
-getindex_unrolled(into::T0, switch) = ()
+getindex_unrolled(into::Tuple{}, switch::Tuple{}) = ()
+getindex_unrolled(into::Tuple{}, switch::ShortTuple) = ()
+getindex_unrolled(into::ShortTuple, switch::Tuple{}) = ()
 """
     getindex_unrolled(into, switch)
 
 ```jldoctest
 julia> using Keys
 
-julia> getindex_unrolled((1, "a", 1.0), (True(), False(), True()))
+julia> getindex_unrolled((1, "a", 1.0), (true, false, true))
 (1, 1.0)
 ```
 """
-Base.@pure function getindex_unrolled(into, switch)
+function getindex_unrolled(into::ShortTuple, switch::ShortTuple)
     next = getindex_unrolled(tail(into), tail(switch))
-    if_else(first(switch), (first(into), next...), next)
+    if Bool(switch[1])
+        (into[1], next...)
+    else
+        next
+    end
 end
 
-export setindex_many_unrolled
+export setindex_unrolled
 """
-    setindex_many_unrolled(old, new, switch, default = missing)
+    setindex_unrolled(old, new, switch, default = missing)
 
 Fill `old` with `new` where `switch` is true. If you run out of new values,
 fill with default instead.
@@ -56,53 +87,50 @@ fill with default instead.
 ```jldoctest
 julia> using Keys
 
-julia> setindex_many_unrolled(
+julia> setindex_unrolled(
             (1, "a", 1.0),
-            (2,),
-            (True(), False(), True()),
-            0
+            ('a', 1//1),
+            (True(), False(), True())
         )
-(2, "a", 0)
+('a', "a", 1//1)
 ```
 """
-setindex_many_unrolled(::T0, ::T0, ::T0, default = missing) = ()
-setindex_many_unrolled(::T0, ::T0, switch, default = missing) = ()
-setindex_many_unrolled(::T0, new, ::T0, default = missing) = ()
-setindex_many_unrolled(::T0, new, switch, default = missing) = ()
-setindex_many_unrolled(old, ::T0, ::T0, default = missing) = ()
-setindex_many_unrolled(old, ::T0, switch, default = missing) =
-    map(old, switch) do aold, aswitch
-        if_else(aswitch, default, aold)
-    end
-setindex_many_unrolled(old, new, ::T0, default = missing) = ()
-function setindex_many_unrolled(old, new, switch, default = missing)
-    first_tuple, tail_tuple = if_else(
-        first(switch),
-        (first(new), tail(new)),
-        (first(old), new)
-    )
-    first_tuple, setindex_many_unrolled(
-        tail(old),
-        tail_tuple,
-        tail(switch),
-    default)...
+setindex_unrolled(::Tuple{}, ::Tuple{}, ::Tuple{}) = ()
+setindex_unrolled(::Tuple{}, ::Tuple{}, switch::ShortTuple) = ()
+setindex_unrolled(::Tuple{}, new::ShortTuple, ::Tuple{}) = ()
+setindex_unrolled(::Tuple{}, new::ShortTuple, switch::ShortTuple) = ()
+setindex_unrolled(old::ShortTuple, ::Tuple{}, ::Tuple{}) = old
+setindex_unrolled(old::ShortTuple, ::Tuple{}, switch::ShortTuple) = old
+setindex_unrolled(old::ShortTuple, new::ShortTuple, ::Tuple{}) = ()
+function setindex_unrolled(old::ShortTuple, new::ShortTuple, switch::ShortTuple)
+    first_tuple, tail_tuple =
+        if Bool(switch[1])
+            (new[1], tail(new))
+        else
+            (old[1], new)
+        end
+    first_tuple, setindex_unrolled(tail(old), tail_tuple, tail(switch))...
 end
 
 export find_unrolled
-find_unrolled(t) = find_unrolled(t, 1)
-find_unrolled(t::T0, n) = ()
+find_unrolled(t::ShortTuple) = find_unrolled(t, 1)
+find_unrolled(t::Tuple{}, n::Integer) = ()
 
 """
 ```jldoctest
 julia> using Keys
 
-julia> find_unrolled((True(), False(), True()))
+julia> find_unrolled((true, false, true))
 (1, 3)
 ```
 """
-function find_unrolled(t, n)
+function find_unrolled(t::ShortTuple, n::Integer)
     next = find_unrolled(tail(t), n + 1)
-    if_else(first(t), (n, next...), next)
+    if Bool(t[1])
+        (n, next...)
+    else
+        next
+    end
 end
 
 export flatten_unrolled
@@ -116,8 +144,8 @@ julia> flatten_unrolled(((1, 2.0), ("c", 4//4)))
 (1, 2.0, "c", 1//1)
 ```
 """
-flatten_unrolled(x) = first(x)..., flatten_unrolled(tail(x))...
-flatten_unrolled(::T0) = ()
+flatten_unrolled(x::ShortTuple) = x[1]..., flatten_unrolled(tail(x))...
+flatten_unrolled(::Tuple{}) = ()
 
 export product_unrolled
 """
@@ -130,7 +158,7 @@ julia> product_unrolled((1, 2.0), ("c", 4//4))
 ((1, "c"), (2.0, "c"), (1, 1//1), (2.0, 1//1))
 ```
 """
-product_unrolled(x, y) = flatten_unrolled(map(
+product_unrolled(x::ShortTuple, y::ShortTuple) = flatten_unrolled(map(
     let x = x
         y1 ->
             map(
@@ -154,4 +182,4 @@ julia> filter_unrolled(pair -> same_type(pair[1], pair[2]), ((1, 2), (1, "a")))
 ((1, 2),)
 ```
 """
-filter_unrolled(f, x) = getindex_unrolled(x, map(f, x))
+filter_unrolled(f, x::ShortTuple) = getindex_unrolled(x, map(f, x))

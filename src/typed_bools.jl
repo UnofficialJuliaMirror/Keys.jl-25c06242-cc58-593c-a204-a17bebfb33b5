@@ -48,10 +48,8 @@ struct True <: TypedBool end
 export False
 struct False <: TypedBool end
 
-Base.Bool(::True) = true
-Base.Bool(::False) = false
-Base.convert(::Type{Bool}, ::True) = true
-Base.convert(::Type{Bool}, ::False) = false
+Bool(::True) = true
+Bool(::False) = false
 
 (&)(::False, ::False) = False()
 (&)(::False, ::True) = False()
