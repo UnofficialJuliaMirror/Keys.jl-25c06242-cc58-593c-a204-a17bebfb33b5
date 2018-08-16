@@ -10,7 +10,7 @@ export Key
 """
     struct Key{K}
 
-A typed key
+A typed key. See [`@__str`](@ref) for an easy way to create keys.
 """
 struct Key{K} end
 
@@ -45,7 +45,8 @@ export Keyed
 """
     struct Keyed{K, V}
 
-An alias for a key-value pair.
+An alias for a [`Key`](@ref)-value pair. A tuple of `Keyed` values is aliased
+as a [`KeyedTuple`](@ref).
 """
 const Keyed{K, V} = Pair{Key{K}, V} where {K, V}
 
@@ -83,8 +84,8 @@ export KeyedTuple
 """
     const KeyedTuple
 
-A tuple with only [`Keyed`](@ref) values. You can index them with keys; on 0.7, y
-ou can also access values with `.`. Duplicated keys are allowed; will return the
+A tuple with only [`Keyed`](@ref) values. You can index them with [`Key`](@ref)s or
+access them with dots. Duplicated keys are allowed; will return the
 first match.
 
 ```jldoctest
@@ -150,7 +151,7 @@ export delete
 """
     delete(keyed_tuple::KeyedTuple, keys::Key...)
 
-Delete all keyed values matching keys.
+Delete all [`Keyed`](@ref) values matching [`Key`](@ref)s in a [`KeyedTuple`](@ref).
 
 ```jldoctest
 julia> using Keys
@@ -166,9 +167,10 @@ delete(keyed_tuple::KeyedTuple, keys::Key...) =
 
 export push
 """
-    push(k1::KeyedTuple, args...)
+    push(keyed_tuple::KeyedTuple, pairs::Keyed...)
 
-Push the pairs in args into `k1`, replacing common keys.
+Push the [`Keyed`](@ref) values in `pairs` into the
+[`KeyedTuple`](@ref), replacing common [`Key`](@ref)s.
 
 ```jldoctest
 julia> using Keys
@@ -177,15 +179,16 @@ julia> push((_"a" => 1, _"b" => 2), _"b" => 4, _"c" => 3)
 (.a => 1, .b => 4, .c => 3)
 ```
 """
-push(k1::KeyedTuple, k2::Keyed...) = delete(k1, key.(k2)...)..., k2...
+push(keyed_tuple::KeyedTuple, pairs::Keyed...) =
+    delete(keyed_tuple, key.(pairs)...)..., pairs...
 
 @inline Base.getproperty(key::KeyedTuple, s::Symbol) = getindex(key, Key{s}())
 
 export map_values
 """
-    map_values(f, key::KeyedTuple)
+    map_values(f, keyed_tuple::KeyedTuple)
 
-Map f over the values of a keyed tuple.
+Map `f` over the values of a [`KeyedTuple`](@ref).
 
 ```jldoctest
 julia> using Keys
@@ -201,23 +204,23 @@ map_values(f, keyed_tuple::KeyedTuple) = map(
     keyed_tuple
 )
 
-rename_one(replacement::Keyed{New, Key{Old}}, old_keyed::Keyed{Old}) where {Old, New} =
-    replacement.first => old_keyed.second
-rename_one(replacement::PairOfKeys, old_keyed::Keyed) = old_keyed
+rename_one(pair_of_keys::Keyed{New, Key{Old}}, old_keyed::Keyed{Old}) where {Old, New} =
+    pair_of_keys.first => old_keyed.second
+rename_one(pair_of_keys::PairOfKeys, old_keyed::Keyed) = old_keyed
 
-rename_single(replacement::PairOfKeys, ::Tuple{}) = ()
-rename_single(replacement::PairOfKeys, keyed_tuple::KeyedTuple) =
-    rename_one(replacement, keyed_tuple[1]),
-    rename_single(replacement, tail(keyed_tuple))...
+rename_single(pair_of_keys::PairOfKeys, ::Tuple{}) = ()
+rename_single(pair_of_keys::PairOfKeys, keyed_tuple::KeyedTuple) =
+    rename_one(pair_of_keys, keyed_tuple[1]),
+    rename_single(pair_of_keys, tail(keyed_tuple))...
 
 rename(keyed_tuple::KeyedTuple) = keyed_tuple
 
 export rename
 """
-    rename(keyed_tuple::KeyedTuple, replacements::PairOfKeys...)
+    rename(keyed_tuple::KeyedTuple, pairs_of_keys::PairOfKeys...)
 
-Replacements should be pairs of keys; where the first key matches in
-`keyed_tuple`, it will be replaced by the second.
+For each pair of [`Key`](@ref)s, where the first key matches in
+[`KeyedTuple`](@ref), it will be replaced by the second.
 
 ```jldoctest
 julia> using Keys
@@ -226,8 +229,8 @@ julia> rename((_"a" => 1, _"b" => 2), _"c" => _"a")
 (.c => 1, .b => 2)
 ```
 """
-rename(keyed_tuple::KeyedTuple, replacements::PairOfKeys...) =
-    rename(rename_single(replacements[1], keyed_tuple), tail(replacements)...)
+rename(keyed_tuple::KeyedTuple, pairs_of_keys::PairOfKeys...) =
+    rename(rename_single(pairs_of_keys[1], keyed_tuple), tail(pairs_of_keys)...)
 
 common_keys(x::KeyedTuple, y::KeyedTuple) =
     first.(filter_unrolled(pair -> same_type(pair[1], pair[2]), product_unrolled(key.(x), key.(y))))

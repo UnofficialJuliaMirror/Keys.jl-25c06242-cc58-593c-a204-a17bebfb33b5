@@ -59,8 +59,6 @@ getindex_unrolled(into::Tuple{}, switch::Tuple{}) = ()
 getindex_unrolled(into::Tuple{}, switch::ShortTuple) = ()
 getindex_unrolled(into::ShortTuple, switch::Tuple{}) = ()
 """
-    getindex_unrolled(into, switch)
-
 ```jldoctest
 julia> using Keys
 
@@ -79,11 +77,6 @@ end
 
 export setindex_unrolled
 """
-    setindex_unrolled(old, new, switch, default = missing)
-
-Fill `old` with `new` where `switch` is true. If you run out of new values,
-fill with default instead.
-
 ```jldoctest
 julia> using Keys
 
@@ -135,8 +128,6 @@ end
 
 export flatten_unrolled
 """
-    flatten_unrolled(x)
-
 ```jldoctest
 julia> using Keys
 
@@ -149,8 +140,6 @@ flatten_unrolled(::Tuple{}) = ()
 
 export product_unrolled
 """
-    product_unrolled(x, y)
-
 ```jldoctest
 julia> using Keys
 
@@ -173,8 +162,6 @@ product_unrolled(x::ShortTuple, y::ShortTuple) = flatten_unrolled(map(
 
 export filter_unrolled
 """
-    filter_unrolled(f, x)
-
 ```jldoctest
 julia> using Keys
 

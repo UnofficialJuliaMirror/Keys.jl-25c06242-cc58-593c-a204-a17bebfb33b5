@@ -2,9 +2,10 @@ export TypedBool
 """
     abstract TypedBool
 
-There are two TypedBools: `True` and `False`. They can be converted to `Bool`s.
-Logical operations are defined for them. Using TypedBools can lead to
-type stability in cases where constant propogation is not working for Bools.
+There are two TypedBools: [`True`](@ref) and [`False`](@ref). They can be
+converted to `Bool`s. Logical operations are defined for them. Using TypedBools
+can lead to type stability in cases where constant propogation is not working
+for Bools.
 
 ```jldoctest
 julia> using Keys
@@ -44,8 +45,11 @@ abstract type TypedBool end
     end
 
 export True
+"A [`TypedBool`](@ref)"
 struct True <: TypedBool end
+
 export False
+"A [`TypedBool`](@ref)"
 struct False <: TypedBool end
 
 Bool(::True) = true
@@ -65,7 +69,7 @@ export not
 """
     not(x)
 
-Negate a TypedBool
+[`TypedBool`](@ref) aware version of `!`.
 
 ```jldoctest
 julia> using Keys
@@ -83,7 +87,7 @@ not(::True) = False()
 """
     if_else(switch, new, old)
 
-Typed-bool aware version of `ifelse`.
+[`TypedBool`](@ref) aware version of `ifelse`.
 
 ```julia
 julia> using Keys
@@ -106,15 +110,15 @@ export same_type
 """
     same_type(a, b)
 
-Check whether `a` and `b` are the same type, return a typed bool.
+Check whether `a` and `b` are the same type; return a [`TypedBool`](@ref).
 
 ```jldoctest
 julia> using Keys
 
-julia> same_type(Val{:a}(), Val{:a}())
+julia> same_type(1, 2)
 True()
 
-julia> same_type(Val{:a}(), Val{:b}())
+julia> same_type(1, 2.0)
 False()
 ```
 """
