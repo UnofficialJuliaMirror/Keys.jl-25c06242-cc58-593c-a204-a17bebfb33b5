@@ -165,8 +165,8 @@ export filter_unrolled
 ```jldoctest
 julia> using Keys
 
-julia> filter_unrolled(pair -> same_type(pair[1], pair[2]), ((1, 2), (1, "a")))
-((1, 2),)
+julia> filter_unrolled(identity, (True(), False()))
+(True(),)
 ```
 """
 filter_unrolled(f, x::ShortTuple) = getindex_unrolled(x, map(f, x))

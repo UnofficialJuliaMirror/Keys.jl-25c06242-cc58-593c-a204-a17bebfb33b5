@@ -2,10 +2,8 @@ export TypedBool
 """
     abstract TypedBool
 
-There are two TypedBools: [`True`](@ref) and [`False`](@ref). They can be
-converted to `Bool`s. Logical operations are defined for them. Using TypedBools
-can lead to type stability in cases where constant propogation is not working
-for Bools.
+typed bools, [`True`](@ref) and [`False`](@ref), can guarantee type stability in
+cases where constant propogation is not working for Bools.
 
 ```jldoctest
 julia> using Keys
@@ -45,11 +43,11 @@ abstract type TypedBool end
     end
 
 export True
-"A [`TypedBool`](@ref)"
+"a [`TypedBool`](@ref)"
 struct True <: TypedBool end
 
 export False
-"A [`TypedBool`](@ref)"
+"a [`TypedBool`](@ref)"
 struct False <: TypedBool end
 
 Bool(::True) = true
