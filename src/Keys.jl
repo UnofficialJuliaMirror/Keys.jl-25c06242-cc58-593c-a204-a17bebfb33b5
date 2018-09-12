@@ -313,7 +313,8 @@ export @q
 """
     macro q(body::Expr)
 
-Will return both an anonymous function and a quoted version of it.
+Similar to [`@_`](@ref), but will return both an anonymous function and a quoted
+version of it.
 
 ```jldoctest
 julia> using Keys
