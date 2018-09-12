@@ -1,7 +1,8 @@
 module Keys
 
-import Base: getindex, haskey, merge, convert, &, |, @pure, Bool, tail
+import Base: getindex, haskey, merge, convert, &, |, @pure, Bool, tail, Generator
 import Base.Meta: quot
+import MacroTools: @capture
 
 include("typed_bools.jl")
 include("recur_unroll.jl")
@@ -10,7 +11,8 @@ export Key
 """
     struct Key{K}
 
-A typed key. See [`@__str`](@ref) for an easy way to create keys.
+A typed key. See [`@__str`](@ref) for an easy way to create keys. Use to create
+[`Keyed`](@ref) values.
 """
 struct Key{K} end
 
@@ -254,5 +256,77 @@ merge(a::KeyedTuple, b::KeyedTuple) =
 
 end
 =#
+
+substitute_underscores!(dictionary, body) = body
+substitute_underscores!(dictionary, body::Symbol) =
+    if all(isequal('_'), string(body))
+        dictionary[body] = gensym("argument")
+    else
+        body
+    end
+substitute_underscores!(dictionary, body::Expr) =
+    if @capture body @_ args__
+        body
+    else
+        Expr(body.head,
+            map(body -> substitute_underscores!(dictionary, body), body.args)
+        ...)
+    end
+
+string_length(something) = something |> String |> length
+
+function make_anonymous(body, line, file)
+    dictionary = Dict{Symbol, Symbol}()
+    new_body = substitute_underscores!(dictionary, body)
+    sorted_dictionary = sort(
+        lt = (pair1, pair2) ->
+            isless(string_length(pair1.first), string_length(pair2.first)),
+        collect(dictionary)
+    )
+    Expr(:->,
+        Expr(:tuple, Generator(pair -> pair.second, sorted_dictionary)...),
+        Expr(:block, LineNumberNode(line, file), new_body)
+    )
+end
+
+"""
+    macro _(body::Expr)
+
+Another syntax for anonymous function. The arguments are inside the body; the
+first arguments is `_`, the second argument is `__`, etc.
+```jldoctest
+julia> using Keys
+
+julia> 1 |> (@_ _ + 1)
+2
+
+julia> map((@_ __ - _), (1, 2), (2, 1))
+(1, -1)
+```
+"""
+macro _(body::Expr)
+    make_anonymous(body, @__LINE__, @__FILE__)
+end
+
+"""
+    macro q(body::Expr)
+
+Will return both an anonymous function and a quoted version of it.
+
+```jldoctest
+julia> using Keys
+
+julia> result = @q _ + 1
+
+julia> result[1](1)
+2
+
+julia> result[2]
+:(_ + 1)
+```
+"""
+macro q(body::Expr)
+    Expr(:tuple, make_anonymous(body, @__LINE__, @__FILE__), quot(body))
+end
 
 end
