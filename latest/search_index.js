@@ -189,7 +189,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Home",
     "title": "Keys.@_",
     "category": "macro",
-    "text": "macro _(body::Expr)\n\nAnother syntax for anonymous function. The arguments are inside the body; the first arguments is _, the second argument is __, etc.\n\njulia> using Keys\n\njulia> 1 |> (@_ _ + 1)\n2\n\njulia> map((@_ __ - _), (1, 2), (2, 1))\n(1, -1)\n\n\n\n\n\n"
+    "text": "macro _(body::Expr)\n\nAnother syntax for anonymous functions. The arguments are inside the body; the first arguments is _, the second argument is __, etc.\n\njulia> using Keys\n\njulia> 1 |> (@_ _ + 1)\n2\n\njulia> map((@_ __ - _), (1, 2), (2, 1))\n(1, -1)\n\n\n\n\n\n"
 },
 
 {
@@ -205,7 +205,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Home",
     "title": "Keys.@q",
     "category": "macro",
-    "text": "macro q(body::Expr)\n\nWill return both an anonymous function and a quoted version of it.\n\njulia> using Keys\n\njulia> result = @q _ + 1;\n\njulia> result[1](1)\n2\n\njulia> result[2]\n:(_ + 1)\n\n\n\n\n\n"
+    "text": "macro q(body::Expr)\n\nSimilar to @_, but will return both an anonymous function and a quoted version of it.\n\njulia> using Keys\n\njulia> result = @q _ + 1;\n\njulia> result[1](1)\n2\n\njulia> result[2]\n:(_ + 1)\n\n\n\n\n\n"
 },
 
 {
