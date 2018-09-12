@@ -22,7 +22,7 @@ export @__str
 """
     @__str
 
-Make a key
+make a key
 
 ```jldoctest
 julia> using Keys
@@ -47,7 +47,7 @@ export Keyed
 """
     struct Keyed{K, V}
 
-An alias for a [`Key`](@ref)-value pair. A tuple of `Keyed` values is aliased
+an alias for a [`Key`](@ref)-value pair. a tuple of `Keyed` values is aliased
 as a [`KeyedTuple`](@ref).
 """
 const Keyed{K, V} = Pair{Key{K}, V} where {K, V}
@@ -56,7 +56,7 @@ export key
 """
     key(keyed::Keyed)
 
-Get the key of a [`Keyed`](@ref) value.
+get the key of a [`Keyed`](@ref) value.
 
 ```jldoctest
 julia> using Keys
@@ -71,7 +71,7 @@ export value
 """
     value(key::Keyed)
 
-Get the value of a [`Keyed`](@ref) value.
+get the value of a [`Keyed`](@ref) value.
 
 ```jldoctest
 julia> using Keys
@@ -153,7 +153,7 @@ export delete
 """
     delete(keyed_tuple::KeyedTuple, keys::Key...)
 
-Delete all [`Keyed`](@ref) values matching [`Key`](@ref)s in a [`KeyedTuple`](@ref).
+delete all [`Keyed`](@ref) values matching [`Key`](@ref)s in a [`KeyedTuple`](@ref).
 
 ```jldoctest
 julia> using Keys
@@ -171,7 +171,7 @@ export push
 """
     push(keyed_tuple::KeyedTuple, pairs::Keyed...)
 
-Push the [`Keyed`](@ref) values in `pairs` into the
+push the [`Keyed`](@ref) values in `pairs` into the
 [`KeyedTuple`](@ref), replacing common [`Key`](@ref)s.
 
 ```jldoctest
@@ -190,7 +190,7 @@ export map_values
 """
     map_values(f, keyed_tuple::KeyedTuple)
 
-Map `f` over the values of a [`KeyedTuple`](@ref).
+map `f` over the values of a [`KeyedTuple`](@ref).
 
 ```jldoctest
 julia> using Keys
@@ -221,7 +221,7 @@ export rename
 """
     rename(keyed_tuple::KeyedTuple, pairs_of_keys::PairOfKeys...)
 
-For each pair of [`Key`](@ref)s, where the first key matches in
+for each pair of [`Key`](@ref)s, where the first key matches in
 [`KeyedTuple`](@ref), it will be replaced by the second.
 
 ```jldoctest
@@ -235,7 +235,7 @@ rename(keyed_tuple::KeyedTuple, pairs_of_keys::PairOfKeys...) =
     rename(rename_single(pairs_of_keys[1], keyed_tuple), tail(pairs_of_keys)...)
 
 common_keys(x::KeyedTuple, y::KeyedTuple) =
-    first.(filter_unrolled(pair -> same_type(pair[1], pair[2]), product_unrolled(key.(x), key.(y))))
+    first.(filter_unrolled(pair -> pair[1] === pair[2], product_unrolled(key.(x), key.(y))))
 
 merge(a::KeyedTuple, b::KeyedTuple) =
     (delete(a, common_keys(a, b)...)..., b...)
