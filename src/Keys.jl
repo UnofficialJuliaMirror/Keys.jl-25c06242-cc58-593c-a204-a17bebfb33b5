@@ -308,4 +308,25 @@ macro _(body::Expr)
     make_anonymous(body, @__LINE__, @__FILE__)
 end
 
+"""
+    macro q(body::Expr)
+
+Will return both an anonymous function and a quoted version of it.
+
+```jldoctest
+julia> using Keys
+
+julia> result = @q _ + 1
+
+julia> result[1](1)
+2
+
+julia> result[2]
+:(_ + 1)
+```
+"""
+macro q(body::Expr)
+    Expr(:tuple, make_anonymous(body, @__LINE__, @__FILE__), quot(body))
+end
+
 end
