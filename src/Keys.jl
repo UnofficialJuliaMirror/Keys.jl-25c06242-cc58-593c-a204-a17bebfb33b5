@@ -316,7 +316,7 @@ Will return both an anonymous function and a quoted version of it.
 ```jldoctest
 julia> using Keys
 
-julia> result = @q _ + 1
+julia> result = @q _ + 1;
 
 julia> result[1](1)
 2
