@@ -293,7 +293,7 @@ export @_
 """
     macro _(body::Expr)
 
-Another syntax for anonymous function. The arguments are inside the body; the
+Another syntax for anonymous functions. The arguments are inside the body; the
 first arguments is `_`, the second argument is `__`, etc.
 ```jldoctest
 julia> using Keys
