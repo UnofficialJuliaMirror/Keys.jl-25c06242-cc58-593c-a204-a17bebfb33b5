@@ -289,6 +289,7 @@ function make_anonymous(body, line, file)
     )
 end
 
+export @_
 """
     macro _(body::Expr)
 
@@ -308,6 +309,7 @@ macro _(body::Expr)
     make_anonymous(body, @__LINE__, @__FILE__)
 end
 
+export @q
 """
     macro q(body::Expr)
 
