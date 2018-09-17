@@ -366,7 +366,7 @@ julia> using Keys
 
 julia> call(source1, source2, anonymous, quoted) = anonymous(source1, source2);
 
-julia> @query 1 |> (_ - 2) |> abs |> call2(_, 2, _ + __)
+julia> @query 1 |> (_ - 2) |> abs(_) |> call2(_, 2, _ + __)
 3
 
 julia> @query 1 |> call2(_)
