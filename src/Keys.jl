@@ -319,12 +319,12 @@ export @__
     macro __(body::Expr)
 
 Similar to [`@_`](@ref), but will return both an anonymous function and a quoted
-version of it.
+version of it (splatted).
 
 ```jldoctest
 julia> using Keys
 
-julia> result = @__ _ + 1;
+julia> result = (@__ _ + 1,);
 
 julia> result[1](1)
 2
