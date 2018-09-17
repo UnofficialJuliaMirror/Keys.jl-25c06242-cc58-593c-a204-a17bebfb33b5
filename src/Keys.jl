@@ -270,9 +270,13 @@ substitute_underscores!(dictionary, body::Symbol) =
         body
     end
 substitute_underscores!(dictionary, body::Expr) =
-    if @capture body @_ args__
+    if body.head == :quote
         body
-    elseif @capture body @__ args__
+    elseif @capture body @_ args__
+        body
+    elseif @capture body @q args__
+        body
+    elseif @capture body @q_ args__
         body
     else
         Expr(body.head,
@@ -387,6 +391,7 @@ julia> call(source1, source2, anonymous, quoted) = anonymous(source1, source2);
 julia> result = @q_ call2(_, 2, _ + __);
 
 julia> result(1)
+3
 ```
 """
 macro q_(body)
