@@ -352,15 +352,15 @@ anonymize it (using the rules of `@_`) and also pass along a quoted version.
 julia> using Keys
 
 julia> @q 1
-Error: Expecting a function call
+Error: LoadError: Expecting a function call
 [...]
 
 julia> @q f(1)
-Error: Expecting function to end in a digit
+Error: LoadError: Expecting function to end in a digit
 [...]
 
 julia> @q f1()
-Error: Expecting at least 1 argument(s)
+Error: LoadError: Expecting at least 1 argument(s)
 [...]
 
 julia> call(source1, source2, anonymous, quoted) = anonymous(source1, source2);
