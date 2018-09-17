@@ -274,10 +274,6 @@ substitute_underscores!(dictionary, body::Expr) =
         body
     elseif @capture body @_ args__
         body
-    elseif @capture body @q args__
-        body
-    elseif @capture body @q_ args__
-        body
     else
         Expr(body.head,
             map(body -> substitute_underscores!(dictionary, body), body.args)
@@ -286,7 +282,7 @@ substitute_underscores!(dictionary, body::Expr) =
 
 string_length(something) = something |> String |> length
 
-function make_anonymous(body, line, file)
+function anonymize(body, line, file)
     dictionary = Dict{Symbol, Symbol}()
     new_body = substitute_underscores!(dictionary, body)
     sorted_dictionary = sort(
@@ -306,6 +302,7 @@ export @_
 
 Another syntax for anonymous functions. The arguments are inside the body; the
 first arguments is `_`, the second argument is `__`, etc.
+
 ```jldoctest
 julia> using Keys
 
@@ -317,87 +314,66 @@ julia> map((@_ __ - _), (1, 2), (2, 1))
 ```
 """
 macro _(body::Expr)
-    make_anonymous(body, @__LINE__, @__FILE__) |> esc
+    anonymize(body, @__LINE__, @__FILE__) |> esc
 end
 
-q(body, line, file) =
-    if @capture body f_(args__)
-        string_f = string(f)
-        last_char = string_f[end]
-        last_digit = tryparse(Int, string(last_char))
-        if last_digit == nothing
-            error("Expecting function to end in a digit")
-        else
-            if length(args) >= last_digit
-                anonymized = ((make_anonymous(arg, line, file), quot(arg))
-                    for arg in args[last_digit+1:end])
-                Expr(:call,
-                    Symbol(chop(string_f)),
-                    args[1:last_digit]...,
-                    flatten(anonymized)...
-                )
-            else
-                error("Expecting at least $last_digit argument(s)")
-            end
-        end
+build_call(afunction, arguments, parity, line, file) =
+    if length(arguments) >= parity
+        anonymous_arguments = ((anonymize(argument, line, file), quot(argument))
+            for argument in arguments[parity+1:end])
+        Expr(:call,
+            afunction,
+            arguments[1:parity]...,
+            flatten(anonymous_arguments)...
+        )
     else
-        error("Expecting a function call")
+        error("Expecting at least $parity argument(s)")
     end
 
-export @q
+anonymize_arguments(atail, line, file) =
+    if @capture atail numberedfunction_(arguments__)
+        string_function = string(numberedfunction)
+        parity = tryparse(Int, string(string_function[end]))
+        if parity == nothing
+            atail
+        else
+            build_call(Symbol(chop(string_function)), arguments, parity, line, file)
+        end
+    else
+        atail
+    end
+
+query(body, line, file)  =
+    if @capture body head_ |> atail_
+        Expr(:call, anonymize(anonymize_arguments(atail, line, file), line, file),
+            query(head, line, file)
+        )
+    else
+        body
+    end
+
+export @query
 """
-    macro q(body::Expr)
+    macro query(body::Expr)
 
-Prepare your code for querying. Body should be a function call, with the
-function ending with the parity. For each argument greater than the parity,
-anonymize it (using the rules of `@_`) and also pass along a quoted version.
-
-```jldoctest
-julia> using Keys
-
-julia> @q 1
-ERROR: LoadError: Expecting a function call
-[...]
-
-julia> @q f(1)
-ERROR: LoadError: Expecting function to end in a digit
-[...]
-
-julia> @q f1()
-ERROR: LoadError: Expecting at least 1 argument(s)
-[...]
-
-julia> call(source1, source2, anonymous, quoted) = anonymous(source1, source2);
-
-julia> @q call2(1, 2, _ + __)
-3
-```
-"""
-macro q(body)
-    q(body, @__LINE__, @__FILE__) |> esc
-end
-
-export @q_
-"""
-    macro q_(body::Expr)
-
-Convenience wrapper for @q and @_
+Prepare your code for querying. If body is a chain `head_ |> tail_`, recur on
+head. If tail is a function call, and the function ends
+with a number (the parity), anonymize and quote arguments past that parity.
+Either way, anonymize the whole tail, then call it on head.
 
 ```jldoctest
 julia> using Keys
 
 julia> call(source1, source2, anonymous, quoted) = anonymous(source1, source2);
 
-julia> result = @q_ call2(_, 2, _ + __);
-
-julia> result(1)
+julia> @query 1 |> (_ - 2) |> abs(_) |> call2(_, 2, _ + __)
 3
 ```
 """
-macro q_(body)
+macro query(body)
     line = @__LINE__
     file = @__FILE__
-    make_anonymous(q(body, line, file), line, file) |> esc
+    query(body, line, file) |> esc
 end
 
 end
