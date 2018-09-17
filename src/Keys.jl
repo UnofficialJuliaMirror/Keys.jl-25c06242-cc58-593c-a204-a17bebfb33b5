@@ -3,6 +3,8 @@ module Keys
 import Base: getindex, haskey, merge, convert, &, |, @pure, Bool, tail, Generator
 import Base.Meta: quot
 import MacroTools: @capture
+import Base.Iterators: flatten
+import Base: Generator
 
 include("typed_bools.jl")
 include("recur_unroll.jl")
@@ -314,27 +316,83 @@ macro _(body::Expr)
     make_anonymous(body, @__LINE__, @__FILE__) |> esc
 end
 
-export @__
-"""
-    macro __(body::Expr)
+q(body, line, file) =
+    if @capture body f_(args__)
+        string_f = string(f)
+        last_char = string_f[end]
+        last_digit = tryparse(Int, string(last_char))
+        if last_digit == nothing
+            error("Expecting function to end in a digit")
+        else
+            if length(args) >= last_digit
+                anonymized = ((make_anonymous(arg, line, file), quot(arg))
+                    for arg in args[last_digit+1:end])
+                Expr(:call,
+                    Symbol(chop(string_f)),
+                    args[1:last_digit]...,
+                    flatten(anonymized)...
+                )
+            else
+                error("Expecting at least $last_digit argument(s)")
+            end
+        end
+    else
+        error("Expecting a function call")
+    end
 
-Similar to [`@_`](@ref), but will return both an anonymous function and a quoted
-version of it (splatted).
+export @q
+"""
+    macro q(body::Expr)
+
+Prepare your code for querying. Body should be a function call, with the
+function ending with the parity. For each argument greater than the parity,
+anonymize it (using the rules of `@_`) and also pass along a quoted version.
 
 ```jldoctest
 julia> using Keys
 
-julia> result = (@__ _ + 1,);
+julia> @q 1
+LoadError: Expecting a function call
+[...]
 
-julia> result[1](1)
-2
+julia> @q f(1)
+LoadError: Expecting function to end in a digit
+[...]
 
-julia> result[2]
-:(_ + 1)
+julia> @q f1()
+LoadError: Expecting at least 1 argument(s)
+[...]
+
+julia> call(source1, source2, anonymous, quoted) = anonymous(source1, source2);
+
+julia> @q call2(1, 2, _ + __)
+3
 ```
 """
-macro __(body::Expr)
-    Expr(:..., Expr(:tuple, make_anonymous(body, @__LINE__, @__FILE__), quot(body))) |> esc
+macro q(body)
+    q(body, @__LINE__, @__FILE__) |> esc
+end
+
+export @q_
+"""
+    macro q_(body::Expr)
+
+Convenience wrapper for @q and @_
+
+```jldoctest
+julia> using Keys
+
+julia> call(source1, source2, anonymous, quoted) = anonymous(source1, source2);
+
+julia> result = @q_ call2(_, 2, _ + __);
+
+julai> result(1)
+```
+"""
+macro q_(body)
+    line = @__LINE__
+    file = @__FILE__
+    make_anonymous(q(body, line, file), line, file) |> esc
 end
 
 end
