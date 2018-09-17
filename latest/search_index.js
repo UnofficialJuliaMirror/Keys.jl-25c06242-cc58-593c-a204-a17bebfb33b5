@@ -205,7 +205,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Home",
     "title": "Keys.@query",
     "category": "macro",
-    "text": "macro query(body::Expr)\n\nPrepare your code for querying. If body is a chain head_ |> tail_, recur on head. If tail is a function call, and the function ends with a number (the parity), anonymize and quote arguments past that parity. Either way, anonymize the whole tail, then call it on head.\n\njulia> using Keys\n\njulia> call(source1, source2, anonymous, quoted) = anonymous(source1, source2);\n\njulia> @query 1 |> (_ - 2) |> abs(_) |> call2(_, 2, _ + __)\n3\n\n\n\n\n\n"
+    "text": "macro query(body::Expr)\n\nQuery your code. If body is a chain head_ |> tail_, recur on head. If tail is a function call, and the function ends with a number (the parity), anonymize and quote arguments past that parity. Either way, anonymize the whole tail, then call it on head.\n\njulia> using Keys\n\njulia> call(source1, source2, anonymous, quoted) = anonymous(source1, source2);\n\njulia> @query 1 |> (_ - 2) |> abs(_) |> call2(_, 2, _ + __)\n3\n\njulia> @query 1 |> call2(_)\nERROR: LoadError: Expecting at least 2 argument(s)\n[...]\n\n\n\n\n\n"
 },
 
 {
