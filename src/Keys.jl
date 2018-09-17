@@ -260,12 +260,17 @@ end
 substitute_underscores!(dictionary, body) = body
 substitute_underscores!(dictionary, body::Symbol) =
     if all(isequal('_'), string(body))
-        dictionary[body] = gensym("argument")
+        if !haskey(dictionary, body)
+            dictionary[body] = gensym("argument")
+        end
+        dictionary[body]
     else
         body
     end
 substitute_underscores!(dictionary, body::Expr) =
     if @capture body @_ args__
+        body
+    elseif @capture body @__ args__
         body
     else
         Expr(body.head,
@@ -306,12 +311,12 @@ julia> map((@_ __ - _), (1, 2), (2, 1))
 ```
 """
 macro _(body::Expr)
-    make_anonymous(body, @__LINE__, @__FILE__)
+    make_anonymous(body, @__LINE__, @__FILE__) |> esc
 end
 
-export @q
+export @__
 """
-    macro q(body::Expr)
+    macro __(body::Expr)
 
 Similar to [`@_`](@ref), but will return both an anonymous function and a quoted
 version of it.
@@ -319,7 +324,7 @@ version of it.
 ```jldoctest
 julia> using Keys
 
-julia> result = @q _ + 1;
+julia> result = @__ _ + 1;
 
 julia> result[1](1)
 2
@@ -328,8 +333,8 @@ julia> result[2]
 :(_ + 1)
 ```
 """
-macro q(body::Expr)
-    Expr(:tuple, make_anonymous(body, @__LINE__, @__FILE__), quot(body))
+macro __(body::Expr)
+    Expr(:..., Expr(:tuple, make_anonymous(body, @__LINE__, @__FILE__) |> esc, quot(body)))
 end
 
 end
