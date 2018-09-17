@@ -356,7 +356,7 @@ export @query
 """
     macro query(body::Expr)
 
-Prepare your code for querying. If body is a chain `head_ |> tail_`, recur on
+Query your code. If body is a chain `head_ |> tail_`, recur on
 head. If tail is a function call, and the function ends
 with a number (the parity), anonymize and quote arguments past that parity.
 Either way, anonymize the whole tail, then call it on head.
@@ -366,8 +366,12 @@ julia> using Keys
 
 julia> call(source1, source2, anonymous, quoted) = anonymous(source1, source2);
 
-julia> @query 1 |> (_ - 2) |> abs(_) |> call2(_, 2, _ + __)
+julia> @query 1 |> (_ - 2) |> |> call2(_, 2, _ + __)
 3
+
+julia> @query 1 |> call2(_)
+ERROR: LoadError: Expecting at least 2 argument(s)
+[...]
 ```
 """
 macro query(body)
