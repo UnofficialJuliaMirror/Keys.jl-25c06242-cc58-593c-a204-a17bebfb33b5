@@ -201,11 +201,19 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "index.html#Keys.@q-Tuple{Expr}",
+    "location": "index.html#Keys.@q-Tuple{Any}",
     "page": "Home",
     "title": "Keys.@q",
     "category": "macro",
-    "text": "macro q(body::Expr)\n\nSimilar to @_, but will return both an anonymous function and a quoted version of it.\n\njulia> using Keys\n\njulia> result = @q _ + 1;\n\njulia> result[1](1)\n2\n\njulia> result[2]\n:(_ + 1)\n\n\n\n\n\n"
+    "text": "macro q(body::Expr)\n\nPrepare your code for querying. Body should be a function call, with the function ending with the parity. For each argument greater than the parity, anonymize it (using the rules of @_) and also pass along a quoted version.\n\njulia> using Keys\n\njulia> @q 1\nERROR: LoadError: Expecting a function call\n[...]\n\njulia> @q f(1)\nERROR: LoadError: Expecting function to end in a digit\n[...]\n\njulia> @q f1()\nERROR: LoadError: Expecting at least 1 argument(s)\n[...]\n\njulia> call(source1, source2, anonymous, quoted) = anonymous(source1, source2);\n\njulia> @q call2(1, 2, _ + __)\n3\n\n\n\n\n\n"
+},
+
+{
+    "location": "index.html#Keys.@q_-Tuple{Any}",
+    "page": "Home",
+    "title": "Keys.@q_",
+    "category": "macro",
+    "text": "macro q_(body::Expr)\n\nConvenience wrapper for @q and @_\n\njulia> using Keys\n\njulia> call(source1, source2, anonymous, quoted) = anonymous(source1, source2);\n\njulia> result = @q_ call2(_, 2, _ + __);\n\njulia> result(1)\n3\n\n\n\n\n\n"
 },
 
 {
