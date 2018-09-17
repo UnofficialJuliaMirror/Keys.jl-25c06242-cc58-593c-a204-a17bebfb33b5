@@ -386,7 +386,7 @@ julia> call(source1, source2, anonymous, quoted) = anonymous(source1, source2);
 
 julia> result = @q_ call2(_, 2, _ + __);
 
-julai> result(1)
+julia> result(1)
 ```
 """
 macro q_(body)
