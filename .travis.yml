@@ -2,11 +2,16 @@ language: julia
 os:
   - linux
 julia:
-  - 0.7
   - 1.0
   - nightly
 notifications:
   email: false
-after_success:
-  - julia -e 'import Keys, Pkg; Pkg.add("Coverage"); import Coverage.Codecov; Keys |> pathof |> dirname |> Codecov.process_folder |> Codecov.submit'
-  - julia -e 'import Keys, Pkg; Pkg.add("Documenter"); joinpath(Keys |> pathof |> dirname |> dirname, "docs", "make.jl") |> include'
+jobs:
+  include:
+    - stage: "Coverage and documentation"
+      julia: 1.0
+      os: linux
+      script:
+        - julia -e 'import Keys, Pkg; Pkg.add("Coverage"); import Coverage.Codecov: process_folder, submit; Keys |> pathof |> dirname |> process_folder |> submit'
+        - julia --project=docs/ -e 'Pkg.develop(PackageSpec(path=pwd()); Pkg.instantiate()'
+        - julia --project=docs/ docs/make.jl
