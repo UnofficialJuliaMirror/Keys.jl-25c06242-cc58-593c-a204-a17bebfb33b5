@@ -8,10 +8,13 @@ notifications:
   email: false
 jobs:
   include:
-    - stage: "Coverage and documentation"
+    - stage: "Coverage and Documentation"
       julia: 1.0
       os: linux
       script:
-        - julia -e 'import Keys, Pkg; Pkg.add("Coverage"); import Coverage.Codecov: process_folder, submit; Keys |> pathof |> dirname |> process_folder |> submit'
         - julia --project=docs/ -e 'Pkg.develop(PackageSpec(path=pwd()); Pkg.instantiate()'
         - julia --project=docs/ docs/make.jl
+    - stage: "Coverage and Documentation"
+      script:
+        - julia --project=coverage/ -e 'using Pkg; Pkg.instantiate()'
+        - julia --project=coverage/ coverage/coverage.jl
