@@ -1,11 +1,5 @@
-import Documenter
-import Keys
+import Documenter: deploydocs
 
-Documenter.makedocs(
-    modules = [Keys],
-    sitename = "Keys.jl",
-)
-
-Documenter.deploydocs(
+deploydocs(
     repo = "github.com/bramtayl/Keys.jl.git",
 )

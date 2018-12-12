@@ -1,5 +1,15 @@
+
 using Keys
-using Test
+import Documenter: makedocs
+
+makedocs(
+    modules = [Keys],
+    sitename = "Keys.jl",
+    root = joinpath(dirname(@__DIR__), "docs"),
+    strict = true
+)
+
+using Test: @test, @test_throws
 
 x = (1, 2, 3)
 t0 = ()
