@@ -1,4 +1,5 @@
 import Documenter
+import Keys
 
 Documenter.makedocs(
     modules = [Keys],
