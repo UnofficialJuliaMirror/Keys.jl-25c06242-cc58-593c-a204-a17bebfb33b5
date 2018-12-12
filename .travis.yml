@@ -6,14 +6,15 @@ julia:
   - nightly
 notifications:
   email: false
+after_success:
+  - julia --project=coverage/ -e 'using Pkg; Pkg.instantiate()'
+  - julia --project=coverage/ coverage/coverage.jl
 jobs:
   include:
     - stage: "Coverage and Documentation"
       julia: 1.0
       os: linux
       script:
-        - julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
-        - julia --project=docs/ docs/make.jl
-    - script:
         - julia --project=coverage/ -e 'using Pkg; Pkg.instantiate()'
         - julia --project=coverage/ coverage/coverage.jl
+      after_success: skip
